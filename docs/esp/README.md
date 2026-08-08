@@ -2,7 +2,7 @@
 
 *Auditor de calidad web -- Rendimiento, SEO, Accesibilidad, Buenas Practicas*
 
-[Tengu](https://github.com/xscriptor/tengu) : [XWA](https://github.com/xscriptor/xwa) submodule focused on web quality auditing -- under active development
+[Tengu](https://github.com/xwebanalysis/tengu) : [XWA](https://github.com/xwebanalysis/meta) submodule focused on web quality auditing -- under active development
 
 [English](../../README.md) | [Espanol](README.md)
 

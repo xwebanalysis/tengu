@@ -9,7 +9,7 @@
 <a href="README.md">English</a> | <a href="docs/esp/README.md">Espanol</a>
 </div>
 
-<p><em><a href="https://github.com/xscriptor/tengu">Tengu</a></em> : <em><a href="https://github.com/xscriptor/xwa">XWA</a> <strong>submodule focused</strong> on web quality auditing -- under active development</em></p>
+<p><em><a href="https://github.com/xwebanalysis/tengu">Tengu</a></em> : <em><a href="https://github.com/xwebanalysis/meta">XWA</a> <strong>submodule focused</strong> on web quality auditing -- under active development</em></p>
 
 <hr>
 
