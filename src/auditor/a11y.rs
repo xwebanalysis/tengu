@@ -67,7 +67,10 @@ fn parse_rgb_function(s: &str) -> Option<(u8, u8, u8)> {
         .strip_prefix("rgb(")
         .or_else(|| s.strip_prefix("rgba("))?
         .strip_suffix(')')?;
-    let parts: Vec<&str> = inner.split(|c| c == ',' || c == ' ' || c == '/').filter(|p| !p.is_empty()).collect();
+    let parts: Vec<&str> = inner
+        .split([',', ' ', '/'])
+        .filter(|p| !p.is_empty())
+        .collect();
     if parts.len() < 3 {
         return None;
     }
@@ -250,24 +253,27 @@ fn is_large_text(style: &str) -> bool {
     let fs = extract_declaration(style, "font-size");
     let fw = extract_declaration(style, "font-weight");
 
-    let size_pt = fs.as_deref().and_then(|v| {
-        let v = v.trim();
-        if let Ok(num) = v.trim_end_matches("px").trim().parse::<f64>() {
-            Some(num * 0.75)
-        } else if let Ok(num) = v.trim_end_matches("pt").trim().parse::<f64>() {
-            Some(num)
-        } else if let Ok(num) = v.trim_end_matches("em").trim().parse::<f64>() {
-            Some(num * 12.0)
-        } else if let Ok(num) = v.trim_end_matches("rem").trim().parse::<f64>() {
-            Some(num * 16.0)
-        } else if let Ok(num) = v.trim_end_matches("%").trim().parse::<f64>() {
-            Some(num * 0.16)
-        } else {
-            None
-        }
-    }).unwrap_or(16.0);
+    let size_pt = fs
+        .as_deref()
+        .and_then(|v| {
+            let v = v.trim();
+            if let Ok(num) = v.trim_end_matches("px").trim().parse::<f64>() {
+                Some(num * 0.75)
+            } else if let Ok(num) = v.trim_end_matches("pt").trim().parse::<f64>() {
+                Some(num)
+            } else if let Ok(num) = v.trim_end_matches("em").trim().parse::<f64>() {
+                Some(num * 12.0)
+            } else if let Ok(num) = v.trim_end_matches("rem").trim().parse::<f64>() {
+                Some(num * 16.0)
+            } else if let Ok(num) = v.trim_end_matches("%").trim().parse::<f64>() {
+                Some(num * 0.16)
+            } else {
+                None
+            }
+        })
+        .unwrap_or(16.0);
 
-    let bold = fw.as_deref().map_or(false, |v| {
+    let bold = fw.as_deref().is_some_and(|v| {
         let v = v.trim().to_lowercase();
         v == "bold" || v == "bolder" || v == "700" || v == "800" || v == "900"
     });
@@ -345,18 +351,23 @@ fn selector_matches_element(selector_parts: &[String], el: &ElementRef) -> bool 
     let simple = last.trim_start_matches(':');
     let tag = el.value().name();
 
-    if simple.starts_with('.') {
-        let cls = &simple[1..];
-        if !el.value().attr("class").map_or(false, |c| c.split_whitespace().any(|p| p.eq_ignore_ascii_case(cls))) {
+    if let Some(cls) = simple.strip_prefix('.') {
+        if !el
+            .value()
+            .attr("class")
+            .is_some_and(|c| c.split_whitespace().any(|p| p.eq_ignore_ascii_case(cls)))
+        {
             return false;
         }
-    } else if simple.starts_with('#') {
-        let id = &simple[1..];
+    } else if let Some(id) = simple.strip_prefix('#') {
         if el.value().attr("id") != Some(id) {
             return false;
         }
     } else if simple.starts_with('[') {
-        let attr_end = simple.find('=').or_else(|| simple.find(']')).unwrap_or(simple.len() - 1);
+        let attr_end = simple
+            .find('=')
+            .or_else(|| simple.find(']'))
+            .unwrap_or(simple.len() - 1);
         let attr_name = &simple[1..attr_end];
         if el.value().attr(attr_name).is_none() {
             return false;
@@ -367,7 +378,7 @@ fn selector_matches_element(selector_parts: &[String], el: &ElementRef) -> bool 
 
     if selector_parts.len() > 1 {
         let parent_sel = &selector_parts[..selector_parts.len() - 1];
-        let parent = el.parent().and_then(|n| ElementRef::wrap(n));
+        let parent = el.parent().and_then(ElementRef::wrap);
         match parent {
             Some(p) if selector_matches_element(parent_sel, &p) => {}
             _ => return selector_parts.len() == 1,
@@ -410,9 +421,13 @@ fn find_decl<'a>(decls: &[&'a (String, String)], name: &str) -> Option<&'a str> 
 // ---------------------------------------------------------------------------
 
 fn inherited_color(el: &ElementRef, rules: &[CssRule]) -> Option<String> {
-    let mut current = el.parent().and_then(|n| ElementRef::wrap(n));
+    let mut current = el.parent().and_then(ElementRef::wrap);
     while let Some(ref ce) = current {
-        if let Some(inline) = ce.value().attr("style").and_then(|s| extract_declaration(s, "color")) {
+        if let Some(inline) = ce
+            .value()
+            .attr("style")
+            .and_then(|s| extract_declaration(s, "color"))
+        {
             if parse_color_value(&inline).is_some() {
                 return Some(inline);
             }
@@ -423,15 +438,19 @@ fn inherited_color(el: &ElementRef, rules: &[CssRule]) -> Option<String> {
                 return Some(val.to_string());
             }
         }
-        current = ce.parent().and_then(|n| ElementRef::wrap(n));
+        current = ce.parent().and_then(ElementRef::wrap);
     }
     None
 }
 
 fn inherited_bg(el: &ElementRef, rules: &[CssRule]) -> Option<String> {
-    let mut current = el.parent().and_then(|n| ElementRef::wrap(n));
+    let mut current = el.parent().and_then(ElementRef::wrap);
     while let Some(ref ce) = current {
-        if let Some(inline) = ce.value().attr("style").and_then(|s| extract_declaration(s, "background-color")) {
+        if let Some(inline) = ce
+            .value()
+            .attr("style")
+            .and_then(|s| extract_declaration(s, "background-color"))
+        {
             let v = inline.trim().to_lowercase();
             if v != "transparent" && parse_color_value(&inline).is_some() {
                 return Some(inline);
@@ -444,7 +463,7 @@ fn inherited_bg(el: &ElementRef, rules: &[CssRule]) -> Option<String> {
                 return Some(val.to_string());
             }
         }
-        current = ce.parent().and_then(|n| ElementRef::wrap(n));
+        current = ce.parent().and_then(ElementRef::wrap);
     }
     None
 }
@@ -483,15 +502,17 @@ fn detect_themes(document: &Html) -> Vec<DetectedTheme> {
     for style_el in document.select(&style_sel) {
         let css = style_el.text().collect::<String>();
         let lower = css.to_lowercase();
-        if lower.contains("@media (prefers-color-scheme: dark)") || lower.contains("@media(prefers-color-scheme:dark)") {
-            if !themes.contains(&DetectedTheme::Dark) {
-                themes.push(DetectedTheme::Dark);
-            }
+        if (lower.contains("@media (prefers-color-scheme: dark)")
+            || lower.contains("@media(prefers-color-scheme:dark)"))
+            && !themes.contains(&DetectedTheme::Dark)
+        {
+            themes.push(DetectedTheme::Dark);
         }
-        if lower.contains("@media (prefers-color-scheme: light)") || lower.contains("@media(prefers-color-scheme:light)") {
-            if !themes.contains(&DetectedTheme::Light) {
-                themes.push(DetectedTheme::Light);
-            }
+        if (lower.contains("@media (prefers-color-scheme: light)")
+            || lower.contains("@media(prefers-color-scheme:light)"))
+            && !themes.contains(&DetectedTheme::Light)
+        {
+            themes.push(DetectedTheme::Light);
         }
     }
 
@@ -499,21 +520,31 @@ fn detect_themes(document: &Html) -> Vec<DetectedTheme> {
     for el in document.select(&html_sel) {
         if let Some(cls) = el.value().attr("class") {
             let lower = cls.to_lowercase();
-            if lower.contains("theme-dark") || lower.contains("dark-theme") || lower.contains("dark-mode") || lower == "dark" {
-                if !themes.contains(&DetectedTheme::Dark) {
-                    themes.push(DetectedTheme::Dark);
-                }
+            if (lower.contains("theme-dark")
+                || lower.contains("dark-theme")
+                || lower.contains("dark-mode")
+                || lower == "dark")
+                && !themes.contains(&DetectedTheme::Dark)
+            {
+                themes.push(DetectedTheme::Dark);
             }
-            if lower.contains("theme-light") || lower.contains("light-theme") || lower.contains("light-mode") || lower == "light" {
-                if !themes.contains(&DetectedTheme::Light) {
-                    themes.push(DetectedTheme::Light);
-                }
+            if (lower.contains("theme-light")
+                || lower.contains("light-theme")
+                || lower.contains("light-mode")
+                || lower == "light")
+                && !themes.contains(&DetectedTheme::Light)
+            {
+                themes.push(DetectedTheme::Light);
             }
         }
         if let Some(data) = el.value().attr("data-theme") {
             match data.trim().to_lowercase().as_str() {
-                "dark" if !themes.contains(&DetectedTheme::Dark) => themes.push(DetectedTheme::Dark),
-                "light" if !themes.contains(&DetectedTheme::Light) => themes.push(DetectedTheme::Light),
+                "dark" if !themes.contains(&DetectedTheme::Dark) => {
+                    themes.push(DetectedTheme::Dark)
+                }
+                "light" if !themes.contains(&DetectedTheme::Light) => {
+                    themes.push(DetectedTheme::Light)
+                }
                 _ => {}
             }
         }
@@ -558,16 +589,14 @@ struct ResolvedStyle {
     has_bg_image: bool,
 }
 
-fn resolve_style(
-    el: &ElementRef,
-    rules: &[CssRule],
-    _theme: DetectedTheme,
-) -> ResolvedStyle {
+fn resolve_style(el: &ElementRef, rules: &[CssRule], _theme: DetectedTheme) -> ResolvedStyle {
     let inline_style = el.value().attr("style").unwrap_or("");
 
     // Inline
-    let inline_color = extract_declaration(inline_style, "color").and_then(|v| parse_color_value(&v));
-    let inline_bg = extract_declaration(inline_style, "background-color").and_then(|v| parse_color_value(&v));
+    let inline_color =
+        extract_declaration(inline_style, "color").and_then(|v| parse_color_value(&v));
+    let inline_bg =
+        extract_declaration(inline_style, "background-color").and_then(|v| parse_color_value(&v));
 
     // Matched rules
     let matched = matching_declarations(el, rules);
@@ -587,7 +616,11 @@ fn resolve_style(
             // Try <html> direct
             let html_sel = Selector::parse("html").unwrap();
             if let Some(html_el) = el.select(&html_sel).next() {
-                html_el.value().attr("style").and_then(|s| extract_declaration(s, "background-color")).and_then(|v| parse_color_value(&v))
+                html_el
+                    .value()
+                    .attr("style")
+                    .and_then(|s| extract_declaration(s, "background-color"))
+                    .and_then(|v| parse_color_value(&v))
             } else {
                 None
             }
@@ -603,7 +636,11 @@ fn resolve_style(
 
     let bg_image = has_bg_image(el, rules);
 
-    ResolvedStyle { color, bg, has_bg_image: bg_image }
+    ResolvedStyle {
+        color,
+        bg,
+        has_bg_image: bg_image,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -662,7 +699,11 @@ fn alt_text_audit(document: &Html, findings: &mut Vec<Finding>) {
         .iter()
         .map(|el| {
             let src = el.value().attr("src").unwrap_or("");
-            format!("  · `{}` src=\"{}\"", el_snippet(el).unwrap_or_default(), truncate(src, 80))
+            format!(
+                "  · `{}` src=\"{}\"",
+                el_snippet(el).unwrap_or_default(),
+                truncate(src, 80)
+            )
         })
         .collect();
 
@@ -691,9 +732,7 @@ fn heading_structure_audit(document: &Html, findings: &mut Vec<Finding>) {
             check: "headings_outline".to_string(),
             severity: Severity::Error,
             title: "Page has no heading structure".into(),
-            description: format!(
-                "The document has no heading elements (h1–h6). Screen reader users rely on headings to navigate and understand the page outline — without them every section sounds like a flat wall of text.\n\nRecommendation: Add a logical hierarchy:\n  1. One <h1> for the page title\n  2. <h2> for each major section\n  3. <h3> for subsections, etc.\n\nReference: WCAG 2.2 Success Criterion 1.3.1 Info and Relationships (Level A), 2.4.10 Section Headings (Level AAA)"
-            ),
+            description: "The document has no heading elements (h1–h6). Screen reader users rely on headings to navigate and understand the page outline — without them every section sounds like a flat wall of text.\n\nRecommendation: Add a logical hierarchy:\n  1. One <h1> for the page title\n  2. <h2> for each major section\n  3. <h3> for subsections, etc.\n\nReference: WCAG 2.2 Success Criterion 1.3.1 Info and Relationships (Level A), 2.4.10 Section Headings (Level AAA)".to_string(),
             snippet: None,
             page_url: None,
         });
@@ -775,7 +814,8 @@ fn aria_audit(document: &Html, findings: &mut Vec<Finding>) {
         }
     }
 
-    let aria_sel = Selector::parse("[role], [aria-label], [aria-labelledby], [aria-describedby]").unwrap();
+    let aria_sel =
+        Selector::parse("[role], [aria-label], [aria-labelledby], [aria-describedby]").unwrap();
     let total = document.select(&aria_sel).count();
     if total == 0 {
         findings.push(Finding {
@@ -783,9 +823,7 @@ fn aria_audit(document: &Html, findings: &mut Vec<Finding>) {
             check: "aria_usage".to_string(),
             severity: Severity::Info,
             title: "No ARIA attributes detected on the page".into(),
-            description: format!(
-                "The page does not use any ARIA attributes (role, aria-label, aria-labelledby, aria-describedby). While this is acceptable for simple static content, complex interactive widgets must use ARIA to communicate semantics, states, and properties to assistive technology.\n\nReference: WAI-ARIA 1.2 Authoring Practices"
-            ),
+            description: "The page does not use any ARIA attributes (role, aria-label, aria-labelledby, aria-describedby). While this is acceptable for simple static content, complex interactive widgets must use ARIA to communicate semantics, states, and properties to assistive technology.\n\nReference: WAI-ARIA 1.2 Authoring Practices".to_string(),
             snippet: None,
             page_url: None,
         });
@@ -794,12 +832,30 @@ fn aria_audit(document: &Html, findings: &mut Vec<Finding>) {
 
 fn landmark_audit(document: &Html, findings: &mut Vec<Finding>) {
     let landmarks: [(&str, Selector); 6] = [
-        ("<header> or role=\"banner\"", Selector::parse("header, [role=banner]").unwrap()),
-        ("<nav> or role=\"navigation\"", Selector::parse("nav, [role=navigation]").unwrap()),
-        ("<main> or role=\"main\"", Selector::parse("main, [role=main]").unwrap()),
-        ("<footer> or role=\"contentinfo\"", Selector::parse("footer, [role=contentinfo]").unwrap()),
-        ("<aside> or role=\"complementary\"", Selector::parse("aside, [role=complementary]").unwrap()),
-        ("<form> with aria-label or role=\"search\"", Selector::parse("form[aria-label], form[aria-labelledby], [role=search]").unwrap()),
+        (
+            "<header> or role=\"banner\"",
+            Selector::parse("header, [role=banner]").unwrap(),
+        ),
+        (
+            "<nav> or role=\"navigation\"",
+            Selector::parse("nav, [role=navigation]").unwrap(),
+        ),
+        (
+            "<main> or role=\"main\"",
+            Selector::parse("main, [role=main]").unwrap(),
+        ),
+        (
+            "<footer> or role=\"contentinfo\"",
+            Selector::parse("footer, [role=contentinfo]").unwrap(),
+        ),
+        (
+            "<aside> or role=\"complementary\"",
+            Selector::parse("aside, [role=complementary]").unwrap(),
+        ),
+        (
+            "<form> with aria-label or role=\"search\"",
+            Selector::parse("form[aria-label], form[aria-labelledby], [role=search]").unwrap(),
+        ),
     ];
 
     let mut present: Vec<&str> = Vec::new();
@@ -878,7 +934,7 @@ fn form_label_audit(document: &Html, findings: &mut Vec<Finding>) {
 
     for ctrl in document.select(&control_sel) {
         let id = ctrl.value().attr("id").map(String::from);
-        let linked = id.as_ref().map_or(false, |id| for_ids.contains(id));
+        let linked = id.as_ref().is_some_and(|id| for_ids.contains(id));
         if linked {
             continue;
         }
@@ -901,7 +957,9 @@ fn form_label_audit(document: &Html, findings: &mut Vec<Finding>) {
             continue;
         }
 
-        if ctrl.value().attr("aria-label").is_some() || ctrl.value().attr("aria-labelledby").is_some() {
+        if ctrl.value().attr("aria-label").is_some()
+            || ctrl.value().attr("aria-labelledby").is_some()
+        {
             continue;
         }
 
@@ -969,7 +1027,11 @@ fn keyboard_audit(document: &Html, findings: &mut Vec<Finding>) {
         .iter()
         .map(|el| {
             let t = el.value().attr("tabindex").unwrap_or("");
-            format!("  · `{}` (tabindex=\"{}\")", el_snippet(el).unwrap_or_default(), t)
+            format!(
+                "  · `{}` (tabindex=\"{}\")",
+                el_snippet(el).unwrap_or_default(),
+                t
+            )
         })
         .collect();
 
@@ -990,16 +1052,33 @@ fn keyboard_audit(document: &Html, findings: &mut Vec<Finding>) {
 fn link_text_audit(document: &Html, findings: &mut Vec<Finding>) {
     let sel = Selector::parse("a[href]").unwrap();
     let generic = [
-        "click here", "here", "read more", "more", "learn more", "this",
-        "link", "go", "details", "info", "continue", "start",
+        "click here",
+        "here",
+        "read more",
+        "more",
+        "learn more",
+        "this",
+        "link",
+        "go",
+        "details",
+        "info",
+        "continue",
+        "start",
     ];
 
     for link in document.select(&sel) {
-        let text: String = link.text().collect::<Vec<_>>().join(" ").trim().to_lowercase();
+        let text: String = link
+            .text()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .trim()
+            .to_lowercase();
         if text.len() < 2 {
             continue;
         }
-        let is_generic = generic.iter().any(|g| text == *g || text.starts_with(&format!("{} ", g)));
+        let is_generic = generic
+            .iter()
+            .any(|g| text == *g || text.starts_with(&format!("{} ", g)));
         if !is_generic {
             continue;
         }
@@ -1084,7 +1163,7 @@ fn iframe_audit(document: &Html, findings: &mut Vec<Finding>) {
         }
 
         let title = iframe.value().attr("title");
-        let has_title = title.map_or(false, |t| !t.trim().is_empty());
+        let has_title = title.is_some_and(|t| !t.trim().is_empty());
 
         if !has_title {
             findings.push(Finding {
@@ -1134,9 +1213,7 @@ fn viewport_audit(document: &Html, findings: &mut Vec<Finding>) {
                 check: "viewport".to_string(),
                 severity: Severity::Warning,
                 title: "Missing viewport meta tag".into(),
-                description: format!(
-                    "The page does not include a <meta name=\"viewport\"> tag. Mobile browsers will render the page at a desktop width and shrink it, making text too small to read without manual zoom.\n\nRecommendation: Add to <head>:\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\nReference: WCAG 2.2 Success Criterion 1.4.4 Resize Text (Level AA)"
-                ),
+                description: "The page does not include a <meta name=\"viewport\"> tag. Mobile browsers will render the page at a desktop width and shrink it, making text too small to read without manual zoom.\n\nRecommendation: Add to <head>:\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\nReference: WCAG 2.2 Success Criterion 1.4.4 Resize Text (Level AA)".to_string(),
                 snippet: None,
                 page_url: None,
             });
@@ -1157,9 +1234,7 @@ fn language_audit(document: &Html, findings: &mut Vec<Finding>) {
                 check: "lang_attribute".to_string(),
                 severity: Severity::Error,
                 title: "<html> element missing lang attribute".into(),
-                description: format!(
-                    "The <html> tag lacks both lang and xml:lang attributes. Assistive technology cannot determine the page's language, which causes incorrect pronunciation, wrong voice selection, and braille translation errors.\n\nRecommendation: Add lang=\"en\" (or the appropriate language code) to the <html> element:\n  <html lang=\"en\">\n\nReference: WCAG 2.2 Success Criterion 3.1.1 Language of Page (Level A)"
-                ),
+                description: "The <html> tag lacks both lang and xml:lang attributes. Assistive technology cannot determine the page's language, which causes incorrect pronunciation, wrong voice selection, and braille translation errors.\n\nRecommendation: Add lang=\"en\" (or the appropriate language code) to the <html> element:\n  <html lang=\"en\">\n\nReference: WCAG 2.2 Success Criterion 3.1.1 Language of Page (Level A)".to_string(),
                 snippet: el_snippet(&el),
                 page_url: None,
             });
@@ -1179,9 +1254,9 @@ fn media_transcript_audit(document: &Html, findings: &mut Vec<Finding>) {
         let tag = el.value().name();
         let src = el.value().attr("src").unwrap_or("");
         let has_track = el.select(&track_sel).any(|t| {
-            t.value()
-                .attr("kind")
-                .map_or(false, |k| k.eq_ignore_ascii_case("captions") || k.eq_ignore_ascii_case("subtitles"))
+            t.value().attr("kind").is_some_and(|k| {
+                k.eq_ignore_ascii_case("captions") || k.eq_ignore_ascii_case("subtitles")
+            })
         });
 
         if !has_track {
@@ -1193,7 +1268,11 @@ fn media_transcript_audit(document: &Html, findings: &mut Vec<Finding>) {
                 "  · <{}> src=\"{}\" {}",
                 tag,
                 truncate(src, 80),
-                if has_track { "✓ has <track>" } else { "✗ missing captions/subtitles" },
+                if has_track {
+                    "✓ has <track>"
+                } else {
+                    "✗ missing captions/subtitles"
+                },
             ));
         }
     }
@@ -1223,6 +1302,9 @@ fn media_transcript_audit(document: &Html, findings: &mut Vec<Finding>) {
 // Enhanced color contrast audit
 // ---------------------------------------------------------------------------
 
+/// (tag, fg_r, fg_g, fg_b, bg_r, bg_g, bg_b, ratio, passes_aa)
+type ContrastExample = (String, u8, u8, u8, u8, u8, u8, f64, bool);
+
 fn color_contrast_audit(document: &Html, findings: &mut Vec<Finding>) {
     let text_sel = Selector::parse(
         "p, span, div, h1, h2, h3, h4, h5, h6, a, li, td, th, label, legend, blockquote, figcaption, cite, small, strong, em, b, i, u, code, pre",
@@ -1230,7 +1312,7 @@ fn color_contrast_audit(document: &Html, findings: &mut Vec<Finding>) {
     .unwrap();
     let rules = collect_style_rules(document);
     let themes = detect_themes(document);
-    let mut all_examples: Vec<(String, u8, u8, u8, u8, u8, u8, f64, bool)> = Vec::new();
+    let mut all_examples: Vec<ContrastExample> = Vec::new();
     let mut bg_image_examples: Vec<String> = Vec::new();
     let mut unmeasurable_count = 0u32;
 
@@ -1253,15 +1335,21 @@ fn color_contrast_audit(document: &Html, findings: &mut Vec<Finding>) {
                 continue;
             }
 
-            let fg = resolved.color.or_else(|| {
-                let inherited = inherited_color(&el, &rules);
-                inherited.as_ref().and_then(|v| parse_color_value(v))
-            }).unwrap_or_else(|| theme_default_fg(*theme));
+            let fg = resolved
+                .color
+                .or_else(|| {
+                    let inherited = inherited_color(&el, &rules);
+                    inherited.as_ref().and_then(|v| parse_color_value(v))
+                })
+                .unwrap_or_else(|| theme_default_fg(*theme));
 
-            let bg = resolved.bg.or_else(|| {
-                let inherited = inherited_bg(&el, &rules);
-                inherited.as_ref().and_then(|v| parse_color_value(v))
-            }).unwrap_or_else(|| theme_default_bg(*theme));
+            let bg = resolved
+                .bg
+                .or_else(|| {
+                    let inherited = inherited_bg(&el, &rules);
+                    inherited.as_ref().and_then(|v| parse_color_value(v))
+                })
+                .unwrap_or_else(|| theme_default_bg(*theme));
 
             let ratio = contrast_ratio(fg, bg);
             let large = is_large_text(inline_style);
@@ -1278,7 +1366,14 @@ fn color_contrast_audit(document: &Html, findings: &mut Vec<Finding>) {
 
             all_examples.push((
                 theme_label(*theme).to_string(),
-                fg.0, fg.1, fg.2, bg.0, bg.1, bg.2, ratio, large,
+                fg.0,
+                fg.1,
+                fg.2,
+                bg.0,
+                bg.1,
+                bg.2,
+                ratio,
+                large,
             ));
         }
     }
@@ -1303,9 +1398,15 @@ fn color_contrast_audit(document: &Html, findings: &mut Vec<Finding>) {
         return;
     }
 
-    let theme_groups: Vec<DetectedTheme> = themes.iter().filter(|t| {
-        all_examples.iter().any(|(th, _, _, _, _, _, _, _, _)| th == theme_label(**t))
-    }).copied().collect();
+    let theme_groups: Vec<DetectedTheme> = themes
+        .iter()
+        .filter(|t| {
+            all_examples
+                .iter()
+                .any(|(th, _, _, _, _, _, _, _, _)| th == theme_label(**t))
+        })
+        .copied()
+        .collect();
 
     let has_multi_theme = theme_groups.len() > 1;
 
@@ -1313,7 +1414,11 @@ fn color_contrast_audit(document: &Html, findings: &mut Vec<Finding>) {
         .iter()
         .map(|(theme_tag, fr, fg, fb, br, bg, bb, ratio, large)| {
             let size_tag = if *large { " (large text)" } else { "" };
-            let theme_prefix = if has_multi_theme { format!("[{}] ", theme_tag) } else { String::new() };
+            let theme_prefix = if has_multi_theme {
+                format!("[{}] ", theme_tag)
+            } else {
+                String::new()
+            };
             format!(
                 "  {}. #{:02x}{:02x}{:02x} on #{:02x}{:02x}{:02x} → ratio {:.2}:1{} — fails AA",
                 theme_prefix, fr, fg, fb, br, bg, bb, ratio, size_tag,
@@ -1323,7 +1428,10 @@ fn color_contrast_audit(document: &Html, findings: &mut Vec<Finding>) {
 
     let theme_note = if has_multi_theme {
         let detected: Vec<String> = themes.iter().map(|t| theme_label(*t).to_string()).collect();
-        format!("\n\nThemes detected: {}. Contrast checked for each theme independently.", detected.join(", "))
+        format!(
+            "\n\nThemes detected: {}. Contrast checked for each theme independently.",
+            detected.join(", ")
+        )
     } else {
         String::new()
     };
@@ -1344,7 +1452,10 @@ fn color_contrast_audit(document: &Html, findings: &mut Vec<Finding>) {
         category: "accessibility".to_string(),
         check: "color_contrast".to_string(),
         severity: Severity::Warning,
-        title: format!("{} element(s) with insufficient color contrast", all_examples.len()),
+        title: format!(
+            "{} element(s) with insufficient color contrast",
+            all_examples.len()
+        ),
         description,
         snippet: None,
         page_url: None,
@@ -1365,7 +1476,7 @@ fn focus_indicator_audit(document: &Html, findings: &mut Vec<Finding>) {
         };
 
         let outline = extract_declaration(style_attr, "outline");
-        let outline_none = outline.as_deref().map_or(false, |v| {
+        let outline_none = outline.as_deref().is_some_and(|v| {
             let v = v.trim().to_lowercase();
             v == "none" || v == "0" || v.starts_with("none ") || v.starts_with("0 ")
         });
@@ -1388,7 +1499,11 @@ fn focus_indicator_audit(document: &Html, findings: &mut Vec<Finding>) {
         .iter()
         .map(|el| {
             let tag = el.value().name();
-            let id = el.value().attr("id").map(|v| format!("#{}", v)).unwrap_or_default();
+            let id = el
+                .value()
+                .attr("id")
+                .map(|v| format!("#{}", v))
+                .unwrap_or_default();
             let cls = el
                 .value()
                 .attr("class")
@@ -1415,4 +1530,38 @@ fn focus_indicator_audit(document: &Html, findings: &mut Vec<Finding>) {
         snippet: examples.first().and_then(el_snippet),
         page_url: None,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FIXTURE: &str = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Fixture</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <img src="/logo.png">
+  <a href="/more">click here</a>
+  <input type="text">
+</body>
+</html>"#;
+
+    #[tokio::test]
+    async fn a11y_analyze_detects_missing_alt_and_labels() {
+        let findings = analyze(FIXTURE).await;
+        assert!(!findings.is_empty(), "fixture should produce findings");
+        assert!(findings.iter().all(|f| f.category == "accessibility"));
+        let checks: Vec<&str> = findings.iter().map(|f| f.check.as_str()).collect();
+        assert!(
+            checks.contains(&"alt_text"),
+            "expected alt_text finding, got {checks:?}"
+        );
+        assert!(
+            checks.contains(&"form_labels"),
+            "expected form_labels finding, got {checks:?}"
+        );
+    }
 }

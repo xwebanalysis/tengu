@@ -1,0 +1,42 @@
+# Rust build artifacts
+target/
+
+# Node / Angular
+frontend/node_modules/
+frontend/.angular/
+frontend/dist/
+
+# Locally built frontend output (built inside the Docker image instead)
+static/
+
+# Runtime DB and exports must never enter the image
+tengu.db
+tengu.db-wal
+tengu.db-shm
+exports/
+
+# Environment / secrets
+.env
+.env.local
+
+# Logs
+*.log
+
+# VCS / CI / editor
+.git/
+.github/
+.gitignore
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docs and meta (not needed for the build)
+*.md
+docs/
+LICENSE

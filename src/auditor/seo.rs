@@ -23,8 +23,18 @@ fn element_snippet(el: &scraper::ElementRef) -> String {
     }
     let self_closing = matches!(
         tag,
-        "meta" | "link" | "br" | "hr" | "img" | "input" | "base" | "col" | "embed"
-            | "source" | "track" | "wbr"
+        "meta"
+            | "link"
+            | "br"
+            | "hr"
+            | "img"
+            | "input"
+            | "base"
+            | "col"
+            | "embed"
+            | "source"
+            | "track"
+            | "wbr"
     );
     if self_closing {
         html.push_str(" />");
@@ -91,14 +101,21 @@ async fn fetch_robots_txt(page_url: &str) -> Result<String, String> {
     }
     let robots_url = format!("{}/robots.txt", base);
     let cfg = TenguConfig::from_env();
-    let client = cfg.http_client_builder()
+    let client = cfg
+        .http_client_builder()
         .timeout(std::time::Duration::from_secs(5))
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
-    let resp = client.get(&robots_url).send().await.map_err(|e| format!("Failed to fetch robots.txt: {}", e))?;
+    let resp = client
+        .get(&robots_url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to fetch robots.txt: {}", e))?;
     if resp.status().is_success() {
-        resp.text().await.map_err(|e| format!("Failed to read robots.txt body: {}", e))
+        resp.text()
+            .await
+            .map_err(|e| format!("Failed to read robots.txt body: {}", e))
     } else {
         Err(format!("HTTP {}", resp.status()))
     }
@@ -119,17 +136,16 @@ fn title_audit(document: &Html, findings: &mut Vec<Finding>) {
                     check: "title".to_string(),
                     severity: Severity::Error,
                     title: "Empty title tag".into(),
-                    description: format!(
-                        "The <title> tag exists but contains no text (0 characters). \
+                    description: "The <title> tag exists but contains no text (0 characters). \
                          Search engines will fall back to displaying the URL or H1 text in \
                          search results instead, which reduces click-through rates. \
                          Recommendation: Add a descriptive title between 50-60 characters that \
                          includes the page's primary topic and target keywords near the front."
-                    ),
+                        .to_string(),
                     snippet,
                     page_url: None,
                 });
-            } else if len < 30 || len > 60 {
+            } else if !(30..=60).contains(&len) {
                 if len < 30 {
                     findings.push(Finding {
                         category: "seo".to_string(),
@@ -175,13 +191,13 @@ fn title_audit(document: &Html, findings: &mut Vec<Finding>) {
                 check: "title".to_string(),
                 severity: Severity::Error,
                 title: "Missing title tag".into(),
-                description: format!(
+                description:
                     "No <title> element was found in the document <head>. The title tag is the \
                      most important on-page SEO element — it appears as the clickable headline \
                      in search results and is a primary ranking signal. \
                      Recommendation: Add <title>Your Page Title Here</title> to the <head>, \
                      keeping it between 50-60 characters with primary keywords near the front."
-                ),
+                        .to_string(),
                 snippet: None,
                 page_url: None,
             });
@@ -203,17 +219,17 @@ fn meta_description_audit(document: &Html, findings: &mut Vec<Finding>) {
                     check: "meta_description".to_string(),
                     severity: Severity::Warning,
                     title: "Empty meta description".into(),
-                    description: format!(
+                    description:
                         "The <meta name=\"description\"> tag exists but has no content. Search \
                          engines will auto-generate a snippet from page content, which may not \
                          accurately represent the page or include a compelling call to action. \
                          Recommendation: Add a concise, engaging description between 50-160 \
                          characters that summarizes the page content and encourages clicks."
-                    ),
+                            .to_string(),
                     snippet,
                     page_url: None,
                 });
-            } else if len < 50 || len > 160 {
+            } else if !(50..=160).contains(&len) {
                 if len < 50 {
                     findings.push(Finding {
                         category: "seo".to_string(),
@@ -244,7 +260,9 @@ fn meta_description_audit(document: &Html, findings: &mut Vec<Finding>) {
                              reduce click-through rates. \
                              Recommendation: Condense to 50-160 characters, keeping the most \
                              compelling content and keywords within the visible portion.",
-                            truncate(content, 120), len, len
+                            truncate(content, 120),
+                            len,
+                            len
                         ),
                         snippet,
                         page_url: None,
@@ -258,13 +276,13 @@ fn meta_description_audit(document: &Html, findings: &mut Vec<Finding>) {
                 check: "meta_description".to_string(),
                 severity: Severity::Warning,
                 title: "Missing meta description".into(),
-                description: format!(
+                description:
                     "No <meta name=\"description\"> tag was found. The meta description is used \
                      by search engines as the summary snippet in search results and is a key \
                      factor in click-through rates. \
                      Recommendation: Add <meta name=\"description\" content=\"A compelling \
                      50-160 character summary of this page's content\" /> to the <head>."
-                ),
+                        .to_string(),
                 snippet: None,
                 page_url: None,
             });
@@ -282,13 +300,13 @@ fn heading_audit(document: &Html, findings: &mut Vec<Finding>) {
             check: "headings".to_string(),
             severity: Severity::Error,
             title: "No headings found".into(),
-            description: format!(
+            description:
                 "The page has no heading elements (h1-h6). Headings provide a hierarchical \
                  structure that helps both users and search engines understand the content \
                  organization. Without headings, the page lacks semantic structure. \
                  Recommendation: Add at least one <h1> for the primary topic, followed by \
                  <h2> through <h6> for subsections in a logical hierarchy."
-            ),
+                    .to_string(),
             snippet: None,
             page_url: None,
         });
@@ -329,10 +347,7 @@ fn heading_audit(document: &Html, findings: &mut Vec<Finding>) {
                 format!("\"{}\"", truncate(&txt, 80))
             })
             .collect();
-        let first_h1 = headings
-            .iter()
-            .find(|h| h.value().name() == "h1")
-            .unwrap();
+        let first_h1 = headings.iter().find(|h| h.value().name() == "h1").unwrap();
         let snippet = Some(element_snippet(first_h1));
 
         findings.push(Finding {
@@ -368,11 +383,11 @@ fn canonical_audit(document: &Html, page_url: &str, findings: &mut Vec<Finding>)
                     check: "canonical".to_string(),
                     severity: Severity::Error,
                     title: "Empty canonical URL".into(),
-                    description: format!(
+                    description:
                         "The <link rel=\"canonical\"> tag exists but the href attribute is empty. \
                          This provides no benefit and may confuse search engine crawlers. \
                          Recommendation: Set the href to the preferred canonical URL for this page."
-                    ),
+                            .to_string(),
                     snippet,
                     page_url: None,
                 });
@@ -484,13 +499,13 @@ fn open_graph_audit(document: &Html, findings: &mut Vec<Finding>) {
             check: "open_graph".to_string(),
             severity: Severity::Warning,
             title: "No Open Graph tags".into(),
-            description: format!(
+            description:
                 "The page has no Open Graph meta tags. When shared on social platforms (Facebook, \
                  LinkedIn, Discord, Slack), pages without OG tags appear as plain text links \
                  with auto-generated snippets, which often lack an image and compelling text. \
                  Recommendation: Add at minimum og:title, og:type, og:image, og:url, and \
                  og:description to the <head> to control how the page appears when shared."
-            ),
+                    .to_string(),
             snippet: None,
             page_url: None,
         });
@@ -607,14 +622,14 @@ fn twitter_card_audit(document: &Html, findings: &mut Vec<Finding>) {
             check: "twitter_card".to_string(),
             severity: Severity::Info,
             title: "No Twitter Card tags".into(),
-            description: format!(
+            description:
                 "The page has no Twitter Card meta tags. Twitter Cards control how content \
                  appears when shared on X (formerly Twitter). Without them, shared links \
                  appear as plain text with no image or rich formatting. \
                  Recommendation: Add twitter:card, twitter:title, twitter:description, and \
                  twitter:image tags. Note: If Open Graph tags are present, Twitter will fall \
                  back to them, so OG tags may be sufficient."
-            ),
+                    .to_string(),
             snippet: None,
             page_url: None,
         });
@@ -715,15 +730,14 @@ fn json_ld_audit(document: &Html, findings: &mut Vec<Finding>) {
             check: "json_ld".to_string(),
             severity: Severity::Info,
             title: "No JSON-LD structured data".into(),
-            description: format!(
-                "The page has no JSON-LD structured data. JSON-LD helps search engines \
+            description: "The page has no JSON-LD structured data. JSON-LD helps search engines \
                  understand the content and enable rich results like star ratings, recipes, \
                  FAQs, events, and breadcrumbs in search results. It is Google's preferred \
                  format for structured data. \
                  Recommendation: Add a <script type=\"application/ld+json\"> block in the <head> \
                  with structured data appropriate for the content type (e.g., Organization, \
                  WebSite, Article, Product, FAQPage, LocalBusiness)."
-            ),
+                .to_string(),
             snippet: None,
             page_url: None,
         });
@@ -786,28 +800,41 @@ fn meta_robots_audit(document: &Html, findings: &mut Vec<Finding>) {
             let directive_desc: Vec<String> = directives
                 .iter()
                 .map(|d| match *d {
-                    "noindex" => format!("\"{}\": Search engines will NOT include this page in their indexes.",
-                        d),
-                    "nofollow" => format!("\"{}\": Search engines will NOT follow links on this page.",
-                        d),
-                    "noarchive" => format!("\"{}\": Search engines will NOT show a cached version in results.",
-                        d),
-                    "nosnippet" => format!("\"{}\": Search engines will NOT show a text snippet in search results.",
-                        d),
+                    "noindex" => format!(
+                        "\"{}\": Search engines will NOT include this page in their indexes.",
+                        d
+                    ),
+                    "nofollow" => format!(
+                        "\"{}\": Search engines will NOT follow links on this page.",
+                        d
+                    ),
+                    "noarchive" => format!(
+                        "\"{}\": Search engines will NOT show a cached version in results.",
+                        d
+                    ),
+                    "nosnippet" => format!(
+                        "\"{}\": Search engines will NOT show a text snippet in search results.",
+                        d
+                    ),
                     "notranslate" => format!(
-                        "\"{}\": Search engines will NOT offer a translation of this page.", d
+                        "\"{}\": Search engines will NOT offer a translation of this page.",
+                        d
                     ),
                     "noimageindex" => format!(
-                        "\"{}\": Search engines will NOT index images found on this page.", d
+                        "\"{}\": Search engines will NOT index images found on this page.",
+                        d
                     ),
-                    "index" => format!("\"{}\": Search engines MAY include this page (default).",
-                        d),
+                    "index" => {
+                        format!("\"{}\": Search engines MAY include this page (default).", d)
+                    }
                     "follow" => format!("\"{}\": Search engines MAY follow links (default).", d),
                     "all" => format!(
-                        "\"{}\": Equivalent to 'index, follow' — no restrictions.", d
+                        "\"{}\": Equivalent to 'index, follow' — no restrictions.",
+                        d
                     ),
                     "none" => format!(
-                        "\"{}\": Equivalent to 'noindex, nofollow' — full restriction.", d
+                        "\"{}\": Equivalent to 'noindex, nofollow' — full restriction.",
+                        d
                     ),
                     _ => format!("\"{}\": Unknown or custom directive.", d),
                 })
@@ -858,12 +885,12 @@ fn meta_robots_audit(document: &Html, findings: &mut Vec<Finding>) {
                 check: "meta_robots".to_string(),
                 severity: Severity::Pass,
                 title: "No meta robots tag".into(),
-                description: format!(
+                description:
                     "No <meta name=\"robots\"> tag was found. By default, search engines assume \
                      'index, follow' — meaning the page can appear in search results and links \
                      can be followed. No action is required unless you need to restrict crawling \
                      or indexing for specific pages."
-                ),
+                        .to_string(),
                 snippet: None,
                 page_url: None,
             });
@@ -881,12 +908,12 @@ fn hreflang_audit(document: &Html, findings: &mut Vec<Finding>) {
             check: "hreflang".to_string(),
             severity: Severity::Pass,
             title: "No hreflang tags".into(),
-            description: format!(
+            description:
                 "No hreflang tags were found. If the site serves content in only one language, \
                  hreflang tags are not required. For multilingual or multi-regional sites, \
                  hreflang tags help search engines serve the correct language or regional \
                  version to users based on their location and language preferences."
-            ),
+                    .to_string(),
             snippet: None,
             page_url: None,
         });
@@ -904,7 +931,7 @@ fn hreflang_audit(document: &Html, findings: &mut Vec<Finding>) {
 
     let langs: Vec<&str> = lang_entries.iter().map(|(l, _)| *l).collect();
     let has_default = langs.contains(&"x-default");
-    let has_self = lang_entries.iter().any(|(_, h)| *h == "");
+    let has_self = lang_entries.iter().any(|(_, h)| h.is_empty());
 
     let snippets: Vec<String> = links.iter().map(|el| element_snippet(el)).collect();
     let summary = truncate(&snippets.join("\n"), 200);
@@ -962,7 +989,11 @@ fn hreflang_audit(document: &Html, findings: &mut Vec<Finding>) {
     }
 }
 
-fn robots_txt_audit(robots_content: &str, page_url: &str, findings: &mut Vec<Finding>) -> Vec<String> {
+fn robots_txt_audit(
+    robots_content: &str,
+    page_url: &str,
+    findings: &mut Vec<Finding>,
+) -> Vec<String> {
     let mut sitemaps: Vec<String> = Vec::new();
     let mut disallowed_paths: Vec<String> = Vec::new();
     let mut allowed_paths: Vec<String> = Vec::new();
@@ -987,7 +1018,6 @@ fn robots_txt_audit(robots_content: &str, page_url: &str, findings: &mut Vec<Fin
                     }
                 }
                 "disallow" => {
-                    let path = if value.is_empty() { "(empty — allows all)" } else { &value };
                     if !disallowed_paths.contains(&value) {
                         let entry = if current_ua.is_empty() || current_ua == "*" {
                             format!("{} (all bots)", value)
@@ -1022,11 +1052,16 @@ fn robots_txt_audit(robots_content: &str, page_url: &str, findings: &mut Vec<Fin
     let mut notes: Vec<String> = Vec::new();
 
     if user_agents.is_empty() {
-        issues.push("No User-agent directives found — all bots are allowed to crawl everything".to_string());
+        issues.push(
+            "No User-agent directives found — all bots are allowed to crawl everything".to_string(),
+        );
     } else if user_agents.len() == 1 && user_agents[0] == "*" {
         notes.push("Has a wildcard User-agent: * — applies to all bots".to_string());
     } else {
-        notes.push(format!("{} specific user-agent rule(s) defined", user_agents.len()));
+        notes.push(format!(
+            "{} specific user-agent rule(s) defined",
+            user_agents.len()
+        ));
     }
 
     if disallowed_paths.is_empty() {
@@ -1072,8 +1107,11 @@ fn robots_txt_audit(robots_content: &str, page_url: &str, findings: &mut Vec<Fin
         return sitemaps;
     }
 
-    let issue_text: Vec<String> = issues.iter().enumerate()
-        .map(|(i, issue)| format!("  {}. {}", i + 1, issue)).collect();
+    let issue_text: Vec<String> = issues
+        .iter()
+        .enumerate()
+        .map(|(i, issue)| format!("  {}. {}", i + 1, issue))
+        .collect();
 
     findings.push(Finding {
         category: "seo".to_string(),
@@ -1119,7 +1157,8 @@ async fn fetch_sitemap_xml(page_url: &str, known_sitemaps: &[String]) -> Result<
     };
 
     let cfg = TenguConfig::from_env();
-    let client = cfg.http_client_builder()
+    let client = cfg
+        .http_client_builder()
         .timeout(std::time::Duration::from_secs(5))
         .build()
         .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
@@ -1146,7 +1185,9 @@ fn sitemap_audit(sitemap_content: &str, findings: &mut Vec<Finding>) {
     let mut notes: Vec<String> = Vec::new();
 
     if is_index {
-        notes.push("This is a sitemap index file (contains references to other sitemaps)".to_string());
+        notes.push(
+            "This is a sitemap index file (contains references to other sitemaps)".to_string(),
+        );
     } else {
         notes.push("This is a standard sitemap file".to_string());
     }
@@ -1154,9 +1195,12 @@ fn sitemap_audit(sitemap_content: &str, findings: &mut Vec<Finding>) {
     notes.push(format!("{} URL(s) declared in sitemap", url_count));
 
     if has_lastmod {
-        notes.push("Includes lastmod dates — helps search engines understand freshness".to_string());
+        notes
+            .push("Includes lastmod dates — helps search engines understand freshness".to_string());
     } else {
-        notes.push("Missing lastmod dates — consider adding <lastmod> for freshness signals".to_string());
+        notes.push(
+            "Missing lastmod dates — consider adding <lastmod> for freshness signals".to_string(),
+        );
     }
 
     if has_changefreq {
@@ -1173,14 +1217,14 @@ fn sitemap_audit(sitemap_content: &str, findings: &mut Vec<Finding>) {
             check: "sitemap".to_string(),
             severity: Severity::Warning,
             title: "Sitemap appears to be empty or unparseable".into(),
-            description: format!(
+            description:
                 "A sitemap file was found but no <loc> (URL) elements were detected. This may \
                  indicate an empty sitemap, incorrect format, or a paginated index that needs \
                  further crawling.\n\n\
                  Recommendation: Verify the sitemap at your browser and ensure it follows the \
                  standard sitemap protocol.\n\n\
                  Reference: sitemaps.org, Google Search Central — Sitemaps"
-            ),
+                    .to_string(),
             snippet: Some(truncate(sitemap_content, 300)),
             page_url: None,
         });
@@ -1228,7 +1272,9 @@ fn extract_links(html: &str, page_url: &str) -> Vec<String> {
             let absolute = if trimmed.starts_with("http://") || trimmed.starts_with("https://") {
                 trimmed.to_string()
             } else if let Ok(base) = Url::parse(page_url) {
-                base.join(trimmed).map(|u| u.to_string()).unwrap_or_default()
+                base.join(trimmed)
+                    .map(|u| u.to_string())
+                    .unwrap_or_default()
             } else {
                 continue;
             };
@@ -1250,7 +1296,8 @@ async fn broken_link_audit(html: &str, page_url: &str, findings: &mut Vec<Findin
     }
 
     let cfg = TenguConfig::from_env();
-    let client = cfg.http_client_builder()
+    let client = cfg
+        .http_client_builder()
         .timeout(std::time::Duration::from_secs(8))
         .build()
         .unwrap();
@@ -1296,9 +1343,10 @@ async fn broken_link_audit(html: &str, page_url: &str, findings: &mut Vec<Findin
         return;
     }
 
-    let detail: Vec<String> = broken.iter().map(|(url, reason)| {
-        format!("  · {} → {}", truncate(url, 80), reason)
-    }).collect();
+    let detail: Vec<String> = broken
+        .iter()
+        .map(|(url, reason)| format!("  · {} → {}", truncate(url, 80), reason))
+        .collect();
 
     findings.push(Finding {
         category: "seo".to_string(),
@@ -1331,7 +1379,8 @@ async fn broken_link_audit(html: &str, page_url: &str, findings: &mut Vec<Findin
 
 async fn redirect_chain_audit(page_url: &str, findings: &mut Vec<Finding>) {
     let cfg = TenguConfig::from_env();
-    let client = cfg.http_client_builder()
+    let client = cfg
+        .http_client_builder()
         .timeout(std::time::Duration::from_secs(10))
         .redirect(reqwest::redirect::Policy::none())
         .build()
@@ -1347,19 +1396,22 @@ async fn redirect_chain_audit(page_url: &str, findings: &mut Vec<Finding>) {
                 let status = resp.status().as_u16();
                 chain.push((status, current_url.clone()));
 
-                if status < 300 || status >= 400 {
+                if !(300..400).contains(&status) {
                     break;
                 }
 
                 if let Some(location) = resp.headers().get("location") {
                     if let Ok(loc_str) = location.to_str() {
-                        let next = if loc_str.starts_with("http://") || loc_str.starts_with("https://") {
-                            loc_str.to_string()
-                        } else if let Ok(base) = Url::parse(&current_url) {
-                            base.join(loc_str).map(|u| u.to_string()).unwrap_or_default()
-                        } else {
-                            break;
-                        };
+                        let next =
+                            if loc_str.starts_with("http://") || loc_str.starts_with("https://") {
+                                loc_str.to_string()
+                            } else if let Ok(base) = Url::parse(&current_url) {
+                                base.join(loc_str)
+                                    .map(|u| u.to_string())
+                                    .unwrap_or_default()
+                            } else {
+                                break;
+                            };
 
                         if next.is_empty() || next == current_url {
                             chain.push((0, "Redirect loop or empty location".to_string()));
@@ -1385,7 +1437,8 @@ async fn redirect_chain_audit(page_url: &str, findings: &mut Vec<Finding>) {
     }
 
     let hops = chain.len() - 1;
-    let detail: Vec<String> = chain.iter()
+    let detail: Vec<String> = chain
+        .iter()
         .enumerate()
         .map(|(i, (status, url))| {
             if *status == 0 {
@@ -1398,8 +1451,6 @@ async fn redirect_chain_audit(page_url: &str, findings: &mut Vec<Finding>) {
 
     let severity = if hops >= 5 {
         Severity::Warning
-    } else if hops >= 3 {
-        Severity::Info
     } else {
         Severity::Info
     };
@@ -1412,7 +1463,9 @@ async fn redirect_chain_audit(page_url: &str, findings: &mut Vec<Finding>) {
         notes.push("Each redirect adds latency (DNS + TCP + TLS + request time)".to_string());
     }
 
-    let has_chain_issues = chain.iter().any(|(status, _)| *status == 0 || *status >= 400);
+    let has_chain_issues = chain
+        .iter()
+        .any(|(status, _)| *status == 0 || *status >= 400);
 
     findings.push(Finding {
         category: "seo".to_string(),
@@ -1442,28 +1495,11 @@ async fn redirect_chain_audit(page_url: &str, findings: &mut Vec<Finding>) {
 fn microdata_rdfa_audit(document: &Html, findings: &mut Vec<Finding>) {
     let itemscope_sel = Selector::parse("[itemscope]").unwrap();
     let rdfa_sel = Selector::parse("[typeof], [vocab]").unwrap();
-    let link_sel = Selector::parse("link[itemprop], meta[itemprop]").unwrap();
+    let props_sel = Selector::parse("[itemprop], [property]").unwrap();
 
     let microdata_items = document.select(&itemscope_sel).count();
     let rdfa_items = document.select(&rdfa_sel).count();
-    let microdata_props = document.select(&link_sel).count();
-    let rdfa_props = 0u32;
-
-    for el in document.select(&rdfa_sel) {
-        let mut count = 0;
-        for _ in el.select(&Selector::parse("[property]").unwrap()) {
-            count += 1;
-        }
-        // rdfa_props += count;  // handled via the main count below
-    }
-
-    let total_props = {
-        let mut c = 0u32;
-        for el in document.select(&Selector::parse("[itemprop], [property]").unwrap()) {
-            c += 1;
-        }
-        c
-    };
+    let total_props = document.select(&props_sel).count() as u32;
 
     if microdata_items == 0 && rdfa_items == 0 {
         findings.push(Finding {
@@ -1471,16 +1507,14 @@ fn microdata_rdfa_audit(document: &Html, findings: &mut Vec<Finding>) {
             check: "structured_data_microdata".to_string(),
             severity: Severity::Info,
             title: "No Microdata or RDFa structured data detected".into(),
-            description: format!(
-                "The page does not use Microdata (itemscope/itemprop) or RDFa (typeof/property/vocab) \
+            description: "The page does not use Microdata (itemscope/itemprop) or RDFa (typeof/property/vocab) \
                  markup. These structured data formats help search engines understand the content \
                  and enable rich results (rich snippets, knowledge panels).\n\n\
                  Alternatives already checked:\n  · JSON-LD: already audited separately\n  \
                  · Open Graph: already audited separately\n  · Twitter Cards: already audited separately\n\n\
                  Recommendation: Consider adding structured data using JSON-LD (recommended by \
                  Google), Microdata, or RDFa.\n\n\
-                 Reference: schema.org, Google Search Central — Structured Data"
-            ),
+                 Reference: schema.org, Google Search Central — Structured Data".to_string(),
             snippet: None,
             page_url: None,
         });
@@ -1490,7 +1524,8 @@ fn microdata_rdfa_audit(document: &Html, findings: &mut Vec<Finding>) {
     let mut details: Vec<String> = Vec::new();
 
     if microdata_items > 0 {
-        let types: Vec<String> = document.select(&itemscope_sel)
+        let types: Vec<String> = document
+            .select(&itemscope_sel)
             .filter_map(|el| el.value().attr("itemtype").map(|t| t.to_string()))
             .collect();
         let unique_types: Vec<&str> = {
@@ -1508,11 +1543,15 @@ fn microdata_rdfa_audit(document: &Html, findings: &mut Vec<Finding>) {
         } else {
             format!(": {}", unique_types.join(", "))
         };
-        details.push(format!("Microdata: {} item(s) with itemscope{}", microdata_items, types_str));
+        details.push(format!(
+            "Microdata: {} item(s) with itemscope{}",
+            microdata_items, types_str
+        ));
     }
 
     if rdfa_items > 0 {
-        let types: Vec<String> = document.select(&rdfa_sel)
+        let types: Vec<String> = document
+            .select(&rdfa_sel)
             .filter_map(|el| el.value().attr("typeof").map(|t| t.to_string()))
             .collect();
         let unique_types: Vec<&str> = {
@@ -1530,20 +1569,30 @@ fn microdata_rdfa_audit(document: &Html, findings: &mut Vec<Finding>) {
         } else {
             format!(" ({})", unique_types.join(", "))
         };
-        details.push(format!("RDFa: {} element(s) with typeof{}", rdfa_items, types_str));
+        details.push(format!(
+            "RDFa: {} element(s) with typeof{}",
+            rdfa_items, types_str
+        ));
     }
 
     if total_props > 0 {
         details.push(format!("Total properties defined: {}", total_props));
     }
 
-    let type_count = if microdata_items > 0 { microdata_items } else { rdfa_items };
+    let type_count = if microdata_items > 0 {
+        microdata_items
+    } else {
+        rdfa_items
+    };
 
     findings.push(Finding {
         category: "seo".to_string(),
         check: "structured_data_microdata".to_string(),
         severity: Severity::Pass,
-        title: format!("Microdata/RDFa structured data found ({} item(s))", type_count),
+        title: format!(
+            "Microdata/RDFa structured data found ({} item(s))",
+            type_count
+        ),
         description: format!(
             "The page uses Microdata and/or RDFa structured data markup.\n\n\
              Details:\n  · {}\n\n\
@@ -1587,7 +1636,7 @@ fn lang_audit(document: &Html, findings: &mut Vec<Finding>) {
                     check: "lang_attribute".to_string(),
                     severity: Severity::Warning,
                     title: "Missing language attribute".into(),
-                    description: format!(
+                    description:
                         "The <html> element has neither a lang nor an xml:lang attribute. \
                          The lang attribute is essential for accessibility (screen readers rely \
                          on it for correct pronunciation), SEO (search engines use it to serve \
@@ -1595,7 +1644,7 @@ fn lang_audit(document: &Html, findings: &mut Vec<Finding>) {
                          translation prompts). \
                          Recommendation: Add lang=\"en\" (or the appropriate language code) to \
                          the <html> element, e.g., <html lang=\"en\">."
-                    ),
+                            .to_string(),
                     snippet,
                     page_url: None,
                 });
@@ -1619,5 +1668,37 @@ fn lang_audit(document: &Html, findings: &mut Vec<Finding>) {
                 });
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FIXTURE: &str = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Short</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+  <p>No headings and no meta description.</p>
+</body>
+</html>"#;
+
+    #[tokio::test]
+    async fn seo_analyze_detects_missing_description_and_headings() {
+        let findings = analyze(FIXTURE, "https://example.com/").await;
+        assert!(!findings.is_empty(), "fixture should produce findings");
+        assert!(findings.iter().all(|f| f.category == "seo"));
+        let checks: Vec<&str> = findings.iter().map(|f| f.check.as_str()).collect();
+        assert!(
+            checks.contains(&"meta_description"),
+            "expected meta_description finding, got {checks:?}"
+        );
+        assert!(
+            checks.contains(&"headings"),
+            "expected headings finding, got {checks:?}"
+        );
     }
 }

@@ -21,9 +21,26 @@ Tengu es un auditor de calidad web que evalua aplicaciones en cuatro dimensiones
 
 | Interfaz | Directorio | Lenguaje | Tipo |
 |---|---|---|---|
-| **Tengu Web** | `/` (raiz del monorepo) | Rust (Axum) + Angular 19 | Aplicacion web (standalone o Docker) |
+| **Tengu Web** | `/` (raiz del monorepo) | Rust (Axum) + Angular 22 | Aplicacion web (standalone o Docker) |
 
 ## Inicio Rapido
+
+### Local (por defecto, SQLite)
+
+```
+./tengu.sh            # ./tengu.sh local
+```
+
+Backend nativo en `http://localhost:8070` con SQLite en `<repo>/tengu.db`
+(configurable con `TENGU_DB_PATH`). Sirve el frontend preconstruido si existe.
+
+### Directo con Cargo
+
+```
+TENGU_DB_PATH=/tmp/tengu.db PORT=8070 cargo run --release
+```
+
+Web UI en `http://localhost:8070`.
 
 ### Version Web (Docker Compose)
 
@@ -31,21 +48,19 @@ Tengu es un auditor de calidad web que evalua aplicaciones en cuatro dimensiones
 docker compose up -d --build
 ```
 
-Web UI en `http://localhost:8080`.
-
-### Standalone (Sin Docker)
-
-```
-cargo run --release
-```
-
-Web UI en `http://localhost:8080`.
+Web UI en `http://localhost:8070`; la base SQLite persiste en el volumen
+`tengu_data` (`/data/tengu.db`).
 
 ### Variables de Entorno
 
 | Variable | Por Defecto | Descripcion |
 |---|---|---|
-| `PORT` | `8080` | Puerto de escucha HTTP |
+| `PORT` | `8070` | Puerto de escucha HTTP |
+| `TENGU_DB_PATH` | `tengu.db` (`/data/tengu.db` en Docker) | Fichero SQLite |
+| `TENGU_MAX_HISTORY` | `100` | Auditorias persistidas maximas |
+| `TENGU_RATE_LIMIT_PER_MINUTE` | `120` | Rate limit REST/WS |
+| `TENGU_MAX_PAGES` / `TENGU_CRAWL_DEPTH` | `50` / `2` | Limites del crawl |
+| `XWA_CORS_ORIGINS` | localhost/LAN | Origenes CORS permitidos |
 | `RUST_LOG` | `tengu=info,tower_http=info` | Verbosidad de logging |
 
 ## Documentos Relacionados
@@ -76,8 +91,9 @@ tengu/
 │   │   ├── best_practices.rs# Headers de seguridad, cookies
 │   │   └── html_pretty.rs   # Pretty-printing de HTML
 │   └── storage/
-│       └── mod.rs           # Almacenamiento en memoria
-├── frontend/                # Angular 19
+│       └── mod.rs           # Almacenamiento en memoria / SQLite / PostgreSQL
+├── contracts.rs             # Contratos xwa-sdk 0.2.0 (Analysis, Finding, Event)
+├── frontend/                # Angular 22 (zoneless, Vitest, Nothing Design)
 │   ├── package.json
 │   ├── angular.json
 │   └── src/app/
@@ -99,9 +115,12 @@ tengu/
 ## Script de Inicio
 
 ```
-./tengu.sh                       # Standalone efimero
-./tengu.sh --docker               # via docker-compose
-./tengu.sh --docker -e            # Docker efimero (--rm)
-./tengu.sh --export archivo.json  # Exportar a ./exports/
-./tengu.sh --import archivo.json  # Importar JSON
+./tengu.sh                        # local (por defecto): SQLite nativo :8070
+./tengu.sh local                  # igual que arriba
+./tengu.sh docker                 # via docker-compose
+./tengu.sh docker --rm            # Docker efimero (--rm)
+./tengu.sh export [archivo]       # Exportar a ./exports/
+./tengu.sh import archivo.json    # Importar JSON
+./tengu.sh build                  # Compilar solo el frontend
+./tengu.sh clean                  # Delegar en ./clean.sh
 ```

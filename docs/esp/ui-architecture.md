@@ -2,75 +2,122 @@
 
 ## Framework
 
-Angular 19 standalone (sin NgModules). La UI sigue el Nothing Design System definido en las referencias de Samurai.
+Angular 22 standalone (sin NgModules), deteccion de cambios zoneless
+(`provideZonelessChangeDetection`), TypeScript 6, `@angular/build:application`,
+Vitest 4 + jsdom mediante `@angular/build:unit-test`. Requiere Node 24
+(`mise`). El build de produccion se emite en `../static` con
+`outputHashing: "none"` para que el backend Axum sirva
+`static/browser/main.js` y `static/browser/styles.css` sin manifest.
+
+Todo el estado usa signals: los callbacks del WebSocket mutan signals y el
+change detection zoneless programa la actualizacion — sin
+`ChangeDetectorRef`.
+
+## Estructura de Directorios
+
+```
+frontend/
+├── public/fonts/                    # woff2 self-hosted (Doto, Space Grotesk, Space Mono)
+├── scripts/test.sh                  # wrapper de npm test (unit-test builder)
+├── src/
+│   ├── _fonts.scss                  # @font-face compilado dentro de styles.css
+│   ├── environments/
+│   │   ├── environment.ts           # apiBaseUrl/wsBaseUrl runtime :8070
+│   │   └── environment.production.ts
+│   ├── styles.scss                  # tokens Nothing (incl. --gold), primitivas, dot-grid
+│   └── app/
+│       ├── core/                    # api, events (WS), live, models, export,
+│       │                            # i18n, theme, snippet-locator
+│       ├── shared/                  # terminal, html-viewer, metric-card,
+│       │                            # severity-tag, status-badge, export-actions
+│       └── features/                # audit, history
+```
 
 ## Arbol de Componentes
 
 ```
-AppComponent (shell)
-├── Sidebar
-│   ├── Marca (TENGU / XWA - MODULE)
-│   ├── Enlaces de navegacion (AUDIT, HISTORY)
-│   └── Footer
-│       ├── Alternador de tema
-│       └── Enlaces sociales (GitHub, repo, dev site)
-└── Router outlet
-    ├── AuditComponent
-    │   ├── Formulario de auditoria (URL, modo, pestañas de categoria)
-    │   ├── Resumen de severidad (conteo de error, warning, info, pass)
-    │   ├── Pestañas de resultado (filtro por categoria)
-    │   ├── Lista de hallazgos en acordeon
-    │   ├── Visor de codigo HTML con resaltado de lineas
-    │   └── AuditExportActionsComponent
-    └── HistoryComponent
-        ├── Boton de actualizar
-        ├── Tabla de auditorias (URL, estado, hallazgos, fecha, enlace de carga)
-        └── Visualizacion de errores
+App (shell: sidebar, toggles de tema/idioma, router-outlet)
+├── AuditComponent
+│   ├── Formulario (URL, single/fullsite/batch, pestañas de checks)
+│   ├── TerminalComponent (lineas de Event, paginas [PAGE], estado live)
+│   ├── MetricCardComponent x4 (high/medium/info/pass)
+│   ├── Lista de hallazgos (SeverityTag + snippet + linea de origen)
+│   ├── HtmlViewerComponent (HTML pretty con resaltado de hallazgos)
+│   └── ExportActionsComponent (CSV/JSON/LH/HTML/MD/PDF)
+└── HistoryComponent
+    ├── StatusBadgeComponent por analisis
+    ├── Grafico de tendencia (high / medium / total)
+    └── Comparacion de 2 auditorias + diffs de severidad
 ```
-
-## Tokens del Sistema de Diseno
-
-Todos los tokens se definen como propiedades CSS personalizadas en `styles.scss`:
-
-- **Fuentes**: Space Grotesk (cuerpo/titulos), Space Mono (datos/codigo), Doto (display)
-- **Esquema de color**: Modo oscuro por defecto, modo claro via clase `.theme-light` en `<body>`
-- **Escala de espaciado**: Base 8px -- 2xs (4px), xs (8px), sm (12px), md (16px), lg (24px), xl (32px), 2xl (48px), 3xl (64px), 4xl (96px)
-- **Motivo de puntos**: Patron de fondo via superposiciones CSS gradient
-
-## Patrones Clave
-
-### Componentes Standalone
-Cada componente es `standalone: true`. Sin NgModules. La funcionalidad compartida (ThemeService) se inyecta directamente.
-
-### Streaming WebSocket
-El componente de auditoria abre un WebSocket a `/api/audit/live` con parametros de consulta para URL, modo, subdominios y comprobaciones. Los mensajes siguen un protocolo de texto simple:
-
-| Prefijo | Contenido |
-|---|---|
-| `[AUDIT]` | Mensaje de registro de estado |
-| `[PAGE]` | URL de pagina descubierta |
-| `[HTML]` | Codigo fuente HTML completo formateado |
-| `[done]` | Auditoria completada exitosamente |
-| `[!]` | Mensaje de error |
-| Objeto JSON | Un hallazgo individual |
-
-### Deteccion de Cambios
-Los callbacks de WebSocket llaman a `ChangeDetectorRef.detectChanges()` manualmente para actualizar la vista fuera de la zona de Angular.
-
-### Exportacion desde el Cliente
-Las exportaciones generan contenido en memoria, crean un Blob y activan la descarga mediante un elemento anchor temporal. No hay generacion de archivos en el servidor.
-
-### Resaltado de Lineas
-Los hallazgos incluyen un fragmento del elemento HTML ofensivo. Despues del formateo, cada elemento ocupa su propia linea, y el frontend empareja fragmentos con lineas por nombre de etiqueta y valores de atributos clave.
 
 ## Rutas
 
 | Ruta | Componente | Descripcion |
 |---|---|---|
-| `/audit` | AuditComponent | Ejecutar y ver auditorias |
-| `/history` | HistoryComponent | Navegar por auditorias pasadas |
-| `/` | (redireccion) | Redirige a `/audit` |
+| `/audit` | `AuditComponent` | Ejecutar y ver auditorias (`?load=<id>` carga del historial) |
+| `/history` | `HistoryComponent` | Lista `/api/analyses`, comparacion y tendencia |
+| `/` | (redirect) | Redirige a `/audit` |
 
-## Servicio de Tema
+## Acceso a la API
 
-`ThemeService` usa Angular Signals para el estado oscuro/claro. El tema actual se persiste en `localStorage` bajo la clave `tengu-theme`. Al alternar se agrega/elimina la clase `.theme-light` en `<body>`.
+Todas las URLs salen de `environment.apiBaseUrl` / `environment.wsBaseUrl`
+(hostname runtime + puerto 8070). `ApiService` expone health,
+`GET/DELETE /api/analyses*`, `DELETE /api/audits/clear` (borrado masivo; no
+existe `DELETE /api/analyses`), constructores de URL de export y del WebSocket
+`/api/audit/live`. Los payloads se normalizan en `models.ts` (`target` → `url`,
+`target_url` → `page_url`, `evidence.snippet` → `snippet`) y la severidad se
+normaliza a la escala unificada `pass|info|low|medium|high|critical`
+(aceptando etiquetas legacy `Pass/Warning/Error`).
+
+## Protocolo WebSocket (xwa-sdk `Event`)
+
+`LiveService` envuelve el socket en un Observable; cada frame se parsea con
+`parseEvent()` y los frames invalidos se ignoran.
+
+| Evento `type` | Payload | Reconstruccion en la UI |
+|---|---|---|
+| `analysis_started` | `{target, mode}` | Linea `[AUDIT_META]`, guarda `analysis_id` |
+| `analysis_progress` | `{message, percent?}` | Linea `[AUDIT]`; `[PAGE] <url>` suma a paginas rastreadas |
+| `log` | `{level, message, data}` | Linea `[LEVEL]`; `message=html_source` → HTML pretty en `data.html` |
+| `item_found` | `Finding` xwa-sdk | Lista de hallazgos (`Pass→pass`, `Info→info`, `Warning→medium`, `Error→high`) |
+| `analysis_completed` | `{status, summary}` | Cierra la ejecucion, `[done]` |
+| `analysis_error` | `{code, message, detail, retryable}` | Muestra `[!] CODE: message` y cierra |
+
+Los errores de transporte cierran la ejecucion con `[!] WebSocket connection
+error`.
+
+## Historial
+
+`HistoryComponent` lee `/api/analyses` (contrato xwa-sdk) manteniendo todas las
+funciones legacy: refrescar, borrar todo, comparar 2 auditorias (`check` +
+`category`, cambios de severidad) y tendencia (high / medium / total). Cada fila
+se carga en la vista de auditoria via `/audit?load=<id>`.
+
+## Exports
+
+`ExportService` genera blobs en memoria (descarga por anchor temporal): CSV,
+JSON, Lighthouse JSON, informe HTML, informe Markdown y PDF (jsPDF + autotable
+con import perezoso para no engordar el bundle inicial). El contexto incluye
+filtros activos, URL, modo y HTML pretty para numeros de linea.
+
+## Sistema de Diseno
+
+Los tokens Nothing viven en `styles.scss` (`--gold: #ffd700` tokenizado; sin
+`#FFD700` hardcodeado). Las fuentes son self-hosted desde `public/fonts` via
+`_fonts.scss`; `index.html` ya no referencia Google Fonts. Los colores de
+estado se aplican al valor (`.sev-*`, `.text-*`), nunca al fondo de fila; sin
+sombras, gradientes (salvo el motivo dot-grid), skeletons ni emojis.
+
+## Tests y Verificacion
+
+```bash
+export PATH="$HOME/.local/share/mise/installs/node/24/bin:$PATH"
+cd frontend
+npm ci
+npm test          # api.service, parseo Event, mapeo de severidad, componente export
+npm run build     # -> ../static/browser
+npm audit --omit=dev
+```
+
+`tsconfig.spec.json` habilita `vitest/globals`; los specs viven junto al codigo
+(`*.spec.ts`). `scripts/test.sh` acepta el flag `--run` de Vitest.

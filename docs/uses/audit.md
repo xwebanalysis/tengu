@@ -4,7 +4,7 @@
 
 ### From the Web UI
 
-1. Navigate to `http://localhost:8080`
+1. Navigate to `http://localhost:8070`
 2. Enter the target URL
 3. Select audit categories using the tab bar (ALL runs all four categories)
 4. Choose audit mode:
@@ -19,7 +19,7 @@
 Open a WebSocket to:
 
 ```
-ws://localhost:8080/api/audit/live?url=<URL>&mode=single&subdomains=false&checks=performance,seo,accessibility,best_practices
+ws://localhost:8070/api/audit/live?url=<URL>&mode=single&subdomains=false&checks=performance,seo,accessibility,best_practices
 ```
 
 ## Understanding Audit Categories

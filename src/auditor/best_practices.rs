@@ -251,8 +251,7 @@ fn doctype_audit(html: &str, findings: &mut Vec<Finding>) {
             check: "doctype".to_string(),
             severity: Severity::Warning,
             title: "Missing or incorrect doctype declaration".into(),
-            description: format!(
-                "The page does not start with <!DOCTYPE html>. Without this declaration, \
+            description: "The page does not start with <!DOCTYPE html>. Without this declaration, \
                  browsers render the page in \"quirks mode\" — emulating old IE5-era box models, \
                  incorrect CSS layout, and non-standard behaviour. This leads to inconsistent \
                  rendering across browsers and layout bugs that are difficult to debug.\n\n\
@@ -261,8 +260,7 @@ fn doctype_audit(html: &str, findings: &mut Vec<Finding>) {
                  Recommendation: Add the HTML5 doctype as the very first line of the document:\n  \
                  <!DOCTYPE html>\n\n\
                  Note: The doctype is case-insensitive but <!DOCTYPE html> (uppercase DOCTYPE, \
-                 lowercase html) is the conventional form."
-            ),
+                 lowercase html) is the conventional form.".to_string(),
             snippet,
             page_url: None,
         });
@@ -430,10 +428,7 @@ fn sri_audit(document: &Html, findings: &mut Vec<Finding>) {
         let examples_text = if examples.is_empty() {
             String::new()
         } else {
-            let listed: Vec<String> = examples
-                .iter()
-                .map(|s| format!("  · {}", s))
-                .collect();
+            let listed: Vec<String> = examples.iter().map(|s| format!("  · {}", s)).collect();
             format!("\n\nResources missing integrity:\n{}", listed.join("\n"))
         };
 
@@ -443,7 +438,10 @@ fn sri_audit(document: &Html, findings: &mut Vec<Finding>) {
             category: "best_practices".to_string(),
             check: "sri".to_string(),
             severity: Severity::Info,
-            title: format!("{} external resource(s) missing Subresource Integrity", total),
+            title: format!(
+                "{} external resource(s) missing Subresource Integrity",
+                total
+            ),
             description: format!(
                 "Found {} external resource(s) ({} script(s), {} stylesheet(s)) loaded without \
                  integrity attributes. Subresource Integrity (SRI) allows the browser to verify \
@@ -496,15 +494,17 @@ fn csp_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
         }
     }
 
-    let has_default_src = directives.iter().any(|d| *d == "default-src");
-    let has_script_src = directives.iter().any(|d| *d == "script-src");
-    let has_style_src = directives.iter().any(|d| *d == "style-src");
-    let has_img_src = directives.iter().any(|d| *d == "img-src");
-    let has_connect_src = directives.iter().any(|d| *d == "connect-src");
-    let has_frame_ancestors = directives.iter().any(|d| *d == "frame-ancestors");
-    let has_report_uri = directives.iter().any(|d| *d == "report-uri" || *d == "report-to");
-    let has_base_uri = directives.iter().any(|d| *d == "base-uri");
-    let has_form_action = directives.iter().any(|d| *d == "form-action");
+    let has_default_src = directives.contains(&"default-src");
+    let has_script_src = directives.contains(&"script-src");
+    let has_style_src = directives.contains(&"style-src");
+    let has_img_src = directives.contains(&"img-src");
+    let has_connect_src = directives.contains(&"connect-src");
+    let has_frame_ancestors = directives.contains(&"frame-ancestors");
+    let has_report_uri = directives
+        .iter()
+        .any(|d| *d == "report-uri" || *d == "report-to");
+    let has_base_uri = directives.contains(&"base-uri");
+    let has_form_action = directives.contains(&"form-action");
 
     if !has_default_src && !has_script_src && !has_style_src {
         issues.push("CSP is present but has no default-src, script-src, or style-src — it may be too permissive or use only uncommon directives".to_string());
@@ -519,11 +519,24 @@ fn csp_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
     }
 
     if !has_base_uri {
-        issues.push("Missing base-uri directive — attackers can inject <base> tags to hijack relative URLs".to_string());
+        issues.push(
+            "Missing base-uri directive — attackers can inject <base> tags to hijack relative URLs"
+                .to_string(),
+        );
     }
 
     if !has_form_action {
         issues.push("Missing form-action directive — forms can submit to any destination, enabling phishing via injected forms".to_string());
+    }
+
+    if !has_default_src && !has_img_src {
+        issues.push(
+            "Missing img-src and default-src — images can be loaded from any origin".to_string(),
+        );
+    }
+
+    if !has_default_src && !has_connect_src {
+        issues.push("Missing connect-src and default-src — fetch/XHR/WebSocket connections are unrestricted".to_string());
     }
 
     if !has_report_uri {
@@ -538,11 +551,18 @@ fn csp_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
         issues.push("Uses 'unsafe-eval' — allows eval(), setTimeout(string), and similar dangerous patterns".to_string());
     }
 
-    if lower.contains("https://") && !lower.contains("https://*.google-analytics.com") && !lower.contains("'self'") {
+    if lower.contains("https://")
+        && !lower.contains("https://*.google-analytics.com")
+        && !lower.contains("'self'")
+    {
         issues.push("Uses https:// whitelisting — prefer 'self' and specific origins over broad https:// allowlists".to_string());
     }
 
-    if !lower.contains("http://") && !lower.contains("https://") && !lower.contains("'self'") && !lower.contains("'none'") {
+    if !lower.contains("http://")
+        && !lower.contains("https://")
+        && !lower.contains("'self'")
+        && !lower.contains("'none'")
+    {
         issues.push("Directives may be overly restrictive — consider using 'self' for same-origin resources".to_string());
     }
 
@@ -565,9 +585,11 @@ fn csp_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
         return;
     }
 
-    let detail: Vec<String> = issues.iter().enumerate().map(|(i, issue)| {
-        format!("  {}. {}", i + 1, issue)
-    }).collect();
+    let detail: Vec<String> = issues
+        .iter()
+        .enumerate()
+        .map(|(i, issue)| format!("  {}. {}", i + 1, issue))
+        .collect();
 
     findings.push(Finding {
         category: "best_practices".to_string(),
@@ -621,10 +643,23 @@ fn permissions_policy_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
     }
 
     let sensitive = [
-        "camera", "microphone", "geolocation", "gyroscope", "accelerometer",
-        "magnetometer", "usb", "serial", "bluetooth", "nfc", "midi",
-        "ambient-light-sensor", "display-capture", "fullscreen",
-        "payment", "picture-in-picture", "screen-wake-lock",
+        "camera",
+        "microphone",
+        "geolocation",
+        "gyroscope",
+        "accelerometer",
+        "magnetometer",
+        "usb",
+        "serial",
+        "bluetooth",
+        "nfc",
+        "midi",
+        "ambient-light-sensor",
+        "display-capture",
+        "fullscreen",
+        "payment",
+        "picture-in-picture",
+        "screen-wake-lock",
     ];
 
     for feature in &sensitive {
@@ -678,33 +713,79 @@ fn gdpr_cookie_consent_audit(document: &Html, findings: &mut Vec<Finding>) {
         ("cookiebot.com", "Cookiebot", "https://www.cookiebot.com"),
         ("onetrust.com", "OneTrust", "https://www.onetrust.com"),
         ("cdn.cookielaw.org", "OneTrust", "https://www.onetrust.com"),
-        ("quantcast.mgr.consensu.org", "Quantcast Choice", "https://quantcast.com"),
+        (
+            "quantcast.mgr.consensu.org",
+            "Quantcast Choice",
+            "https://quantcast.com",
+        ),
         ("osano.com", "Osano", "https://www.osano.com"),
         ("cookieyes.com", "CookieYes", "https://www.cookieyes.com"),
-        ("usercentrics.eu", "Usercentrics", "https://usercentrics.com"),
-        ("cdn.usercentrics.eu", "Usercentrics", "https://usercentrics.com"),
+        (
+            "usercentrics.eu",
+            "Usercentrics",
+            "https://usercentrics.com",
+        ),
+        (
+            "cdn.usercentrics.eu",
+            "Usercentrics",
+            "https://usercentrics.com",
+        ),
         ("didomi.io", "Didomi", "https://www.didomi.io"),
         ("sdk.didomi.io", "Didomi", "https://www.didomi.io"),
         ("complianz.io", "Complianz", "https://complianz.io"),
         ("borlabs.io", "Borlabs", "https://borlabs.io"),
         ("iubenda.com", "iubenda", "https://www.iubenda.com"),
         ("cdn.iubenda.com", "iubenda", "https://www.iubenda.com"),
-        ("cookieinformation.com", "Cookie Information", "https://cookieinformation.com"),
-        ("cookiescript.com", "CookieScript", "https://cookiescript.com"),
+        (
+            "cookieinformation.com",
+            "Cookie Information",
+            "https://cookieinformation.com",
+        ),
+        (
+            "cookiescript.com",
+            "CookieScript",
+            "https://cookiescript.com",
+        ),
         ("termly.io", "Termly", "https://termly.io"),
-        ("consentmanager.net", "ConsentManager", "https://www.consentmanager.net"),
+        (
+            "consentmanager.net",
+            "ConsentManager",
+            "https://www.consentmanager.net",
+        ),
         ("cookiefirst.com", "CookieFirst", "https://cookiefirst.com"),
         ("cookiepro.com", "CookiePro", "https://www.cookiepro.com"),
     ];
 
     let banner_keywords: &[&str] = &[
-        "cookie-consent", "cookieconsent", "cookie-notice", "cookienotice",
-        "cookie-banner", "cookiebanner", "cookie-bar", "cookiebar",
-        "gdpr", "gdpr-banner", "gdprbanner", "consent-banner", "consentbanner",
-        "cc-banner", "cc-banner", "cookie-overlay", "cookieoverlay",
-        "cookie-popup", "cookiepopup", "cookie-dialog", "cookiedialog",
-        "notice-bar", "noticebar", "cookie-law", "cookielaw",
-        "cookie-compliance", "cookiecompliance", "eu-cookie", "eucookie",
+        "cookie-consent",
+        "cookieconsent",
+        "cookie-notice",
+        "cookienotice",
+        "cookie-banner",
+        "cookiebanner",
+        "cookie-bar",
+        "cookiebar",
+        "gdpr",
+        "gdpr-banner",
+        "gdprbanner",
+        "consent-banner",
+        "consentbanner",
+        "cc-banner",
+        "cc-banner",
+        "cookie-overlay",
+        "cookieoverlay",
+        "cookie-popup",
+        "cookiepopup",
+        "cookie-dialog",
+        "cookiedialog",
+        "notice-bar",
+        "noticebar",
+        "cookie-law",
+        "cookielaw",
+        "cookie-compliance",
+        "cookiecompliance",
+        "eu-cookie",
+        "eucookie",
     ];
 
     let mut detected_cmp: Option<&str> = None;
@@ -729,9 +810,20 @@ fn gdpr_cookie_consent_audit(document: &Html, findings: &mut Vec<Finding>) {
         let inline_sel = Selector::parse("script:not([src])").unwrap();
         for el in document.select(&inline_sel) {
             let text = el.text().collect::<String>().to_lowercase();
-            let indicators = ["cookieconsent", "onetrust", "cookiebot", "__tcfapi",
-                "cmp.show", "gdpr", "consent", "cookie_notice", "cookieBanner",
-                "data-cookieconsent", "cookiehub", "ccpa"];
+            let indicators = [
+                "cookieconsent",
+                "onetrust",
+                "cookiebot",
+                "__tcfapi",
+                "cmp.show",
+                "gdpr",
+                "consent",
+                "cookie_notice",
+                "cookieBanner",
+                "data-cookieconsent",
+                "cookiehub",
+                "ccpa",
+            ];
             if indicators.iter().any(|i| text.contains(i)) {
                 detected_cmp = Some("a CMP (detected via inline script)");
                 break;
@@ -758,8 +850,16 @@ fn gdpr_cookie_consent_audit(document: &Html, findings: &mut Vec<Finding>) {
     match detected_cmp {
         Some(cmp) => {
             let is_user_managed = cmp.starts_with("a banner") || cmp.starts_with("a CMP");
-            let severity = if is_user_managed { Severity::Info } else { Severity::Pass };
-            let sev_label = if is_user_managed { "user-managed" } else { "trusted" };
+            let severity = if is_user_managed {
+                Severity::Info
+            } else {
+                Severity::Pass
+            };
+            let sev_label = if is_user_managed {
+                "user-managed"
+            } else {
+                "trusted"
+            };
 
             findings.push(Finding {
                 category: "best_practices".to_string(),
@@ -802,7 +902,7 @@ fn gdpr_cookie_consent_audit(document: &Html, findings: &mut Vec<Finding>) {
                 check: "gdpr_consent".to_string(),
                 severity: Severity::Warning,
                 title: "No GDPR cookie consent mechanism detected".into(),
-                description: format!(
+                description:
                     "No cookie consent banner, CMP script, or cookie notice was detected on the \
                      page. If this site serves users in the EU/EEA, UK, Brazil (LGPD), California \
                      (CCPA/CPRA), or other regions with privacy regulations, this may be a legal \
@@ -824,7 +924,7 @@ fn gdpr_cookie_consent_audit(document: &Html, findings: &mut Vec<Finding>) {
                      detected by pattern matching.\n\n\
                      Reference: EU GDPR Art. 7, ePrivacy Directive Art. 5(3), \
                      IAB Europe TCF v2.2"
-                ),
+                        .to_string(),
                 snippet: None,
                 page_url: None,
             });
@@ -838,7 +938,7 @@ fn console_error_note(findings: &mut Vec<Finding>) {
         check: "console_errors".to_string(),
         severity: Severity::Info,
         title: "JavaScript console error detection requires browser runtime".into(),
-        description: format!(
+        description:
             "Tengu's server-side HTTP fetch cannot capture JavaScript runtime errors because JS \
              does not execute during a plain HTTP request.\n\n\
              To audit console errors:\n  \
@@ -851,8 +951,41 @@ fn console_error_note(findings: &mut Vec<Finding>) {
              • Content Security Policy violations\n  \
              • Deprecated API warnings\n  \
               • Unhandled Promise rejections"
-        ),
+                .to_string(),
         snippet: None,
         page_url: None,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FIXTURE: &str = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Fixture</title>
+  <script src="http://cdn.example.com/lib.js"></script>
+</head>
+<body>
+  <a href="http://insecure.example.com">insecure link</a>
+</body>
+</html>"#;
+
+    #[tokio::test]
+    async fn best_practices_analyze_reports_headers_and_mixed_content() {
+        let findings = analyze(FIXTURE, &HeaderMap::new(), "https://example.com").await;
+        assert!(!findings.is_empty(), "fixture should produce findings");
+        assert!(findings.iter().all(|f| f.category == "best_practices"));
+        let checks: Vec<&str> = findings.iter().map(|f| f.check.as_str()).collect();
+        assert!(
+            checks.contains(&"security_headers"),
+            "expected security_headers finding, got {checks:?}"
+        );
+        assert!(
+            checks.contains(&"mixed_content"),
+            "expected mixed_content finding, got {checks:?}"
+        );
+    }
 }

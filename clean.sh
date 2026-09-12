@@ -19,6 +19,10 @@ clean_local_build() {
     rm -rf "$PROJECT_ROOT/target" 2>/dev/null && info "  Removed target/"
     rm -rf "$PROJECT_ROOT/frontend/node_modules" 2>/dev/null && info "  Removed frontend/node_modules/"
     rm -rf "$PROJECT_ROOT/frontend/.angular" 2>/dev/null && info "  Removed frontend/.angular/"
+    if ls "$PROJECT_ROOT"/tengu.db* >/dev/null 2>&1; then
+        rm -f "$PROJECT_ROOT"/tengu.db "$PROJECT_ROOT"/tengu.db-wal "$PROJECT_ROOT"/tengu.db-shm
+        info "  Removed tengu.db*"
+    fi
     log "Local build cleaned"
 }
 
@@ -84,7 +88,7 @@ Options:
   -v, --volumes  Remove Docker volumes only (retain images)
   -h, --help     Show this help
 
-Without options, removes containers, target/, node_modules/ and .angular/ cache.
+Without options, removes containers, target/, node_modules/, .angular/ cache and tengu.db*.
 EOF
     exit 0
 }

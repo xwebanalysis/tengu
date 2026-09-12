@@ -1,51 +1,55 @@
 # Rust Libraries (Backend Dependencies)
 
-Tengu's backend is a Rust application using the Axum web framework. Below is the complete dependency inventory.
+Tengu's backend is an Axum 0.8 application on Tokio. Dependencies are pinned in
+`Cargo.lock` (versioned). Last audit: 2026-09-12, Rust 1.98.
 
 ## Web Framework & Server
 
 | Crate | Version | Purpose |
 |---|---|---|
-| `axum` | 0.7 | HTTP framework with WebSocket support |
-| `tower-http` | 0.5 | CORS middleware |
-| `tokio` | 1 | Async runtime (full features) |
-| `tokio-stream` | 0.1 | Async stream utilities |
-| `tower` | 0.5 | Async service layers |
+| `axum` | 0.8 | HTTP framework with WebSocket support |
+| `tower-http` | 0.7 | CORS middleware |
+| `tokio` | 1.53 | Async runtime (`full` features) |
 
 ## HTTP Client
 
 | Crate | Version | Purpose |
 |---|---|---|
-| `reqwest` | 0.12 | HTTP client with rustls-tls, gzip, brotli, cookie support |
+| `reqwest` | 0.13 | HTTP client with rustls, charset, http2, cookies, gzip/brotli, JSON |
+| `url` | 2 | URL parsing, normalization and crawl scoping |
 
 ## HTML Parsing & Selection
 
 | Crate | Version | Purpose |
 |---|---|---|
-| `scraper` | 0.21 | HTML parser and CSS selector engine (wraps html5ever and selectors) |
-| `selectors` | 0.26 | CSS selector matching |
-| `ego-tree` | 0.9 | DOM tree data structure (used by scraper) |
-| `cssparser` | 0.34 | CSS tokenizer/parser |
+| `scraper` | 0.27 | HTML parser and CSS selector engine (html5ever + selectors 0.38) |
+| `ego-tree` | 0.11 | DOM node references used by `html_pretty` (must match scraper's version) |
 
-## Serialization
+`selectors` is no longer a direct dependency (scraper pulls its own);
+`fxhash` is no longer in the dependency graph (selectors now uses
+`rustc-hash`).
+
+## Persistence
 
 | Crate | Version | Purpose |
 |---|---|---|
-| `serde` | 1 | Serialization framework (with derive) |
+| `sqlx` | 0.9 | Async SQL; features `runtime-tokio`, `sqlite`, `chrono`, `uuid`, `json` |
+| `sqlx` (`pg` feature) | 0.9 | Optional PostgreSQL support (`sqlx/postgres`, `sqlx/tls-rustls`) |
+| `dashmap` | 6 | In-memory fallback store and concurrent map |
+| `uuid` | 1 | Audit identifiers (v4, serde) |
+| `chrono` | 0.4 | Timestamps (serde) |
+| `thiserror` | 2 | `StoreError` derivation |
+
+`event-listener` (transitive via `sqlx-core`) is pinned at **5.4.2**, which
+remediates RUSTSEC-2026-0221. `rsa` is not compiled (sqlx-mysql is not enabled).
+
+## Serialization & Contracts
+
+| Crate | Version | Purpose |
+|---|---|---|
+| `serde` | 1 | Serialization framework (derive) |
 | `serde_json` | 1 | JSON serialization/deserialization |
-| `url` | 2 | URL parsing and normalization |
-
-## Utilities
-
-| Crate | Version | Purpose |
-|---|---|---|
-| `uuid` | 1 | Audit record IDs (v4) |
-| `chrono` | 0.4 | Timestamps for audit records |
-| `dashmap` | 6 | Concurrent in-memory audit store |
-| `regex` | 1 | Pattern matching for HTML analysis |
-| `sha2` | 0.10 | Hashing (future use) |
-| `base64` | 0.22 | Base64 encoding (future use) |
-| `thiserror` | 2 | Error type derivation |
+| `contracts.rs` | — | Hand-mirrored xwa-sdk 0.2.0 models (`Analysis`, `Finding`, `Event`, `Error`, `Summary`) |
 
 ## Logging & Observability
 
@@ -53,4 +57,22 @@ Tengu's backend is a Rust application using the Axum web framework. Below is the
 |---|---|---|
 | `tracing` | 0.1 | Structured logging |
 | `tracing-subscriber` | 0.3 | Log output formatting with env-filter |
-| `futures` | 0.3 | Async combinators |
+
+## Security & Limits
+
+- Token bucket rate limiter implemented in-process (`main.rs`), 120 req/min.
+- Constant-time API key comparison.
+- CORS via `tower-http`, `XWA_CORS_ORIGINS` driven.
+- Crawl: robots.txt parser, jittered delays, exponential backoff, page/depth
+  caps and per-request timeouts.
+
+## Removed from earlier versions
+
+| Crate | Why |
+|---|---|
+| `selectors` | Unused directly; scraper provides selectors |
+| `regex` | Unused |
+| `sha2` | Unused (SRI hashes are computed externally by site owners) |
+| `base64` | Unused (same) |
+| `futures` | Unused |
+| `tokio-stream` | Unused |

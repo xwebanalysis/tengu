@@ -4,7 +4,7 @@
 
 ### Desde la Interfaz Web
 
-1. Navega a `http://localhost:8080`
+1. Navega a `http://localhost:8070`
 2. Ingresa la URL objetivo
 3. Selecciona las categorias de auditoria usando las pestañas (ALL ejecuta las cuatro categorias)
 4. Elige el modo de auditoria:
@@ -19,7 +19,7 @@
 Abre un WebSocket a:
 
 ```
-ws://localhost:8080/api/audit/live?url=<URL>&mode=single&subdomains=false&checks=performance,seo,accessibility,best_practices
+ws://localhost:8070/api/audit/live?url=<URL>&mode=single&subdomains=false&checks=performance,seo,accessibility,best_practices
 ```
 
 ## Categorias de Auditoria

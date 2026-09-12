@@ -1,0 +1,174 @@
+<header class="section-header">
+  <div>
+    <h1 class="t-heading">{{ 'history.title' | t }}</h1>
+    <span class="t-label">{{ 'history.subtitle' | t }}</span>
+  </div>
+  <div class="header-actions">
+    <button type="button" class="btn-refresh t-label" (click)="loadHistory()" [disabled]="isLoading()">
+      {{ isLoading() ? ('history.refreshing' | t) : ('history.refresh' | t) }}
+    </button>
+    <button
+      type="button"
+      class="btn-refresh t-label"
+      (click)="toggleCompare()"
+      [class.active]="compareMode()"
+    >
+      {{ compareMode() ? ('history.exit_compare' | t) : ('history.compare' | t) }}
+    </button>
+    @if (audits().length > 0) {
+      <button
+        type="button"
+        class="btn-refresh btn-danger t-label"
+        (click)="clearAll()"
+        [disabled]="clearing()"
+      >
+        {{ clearing() ? ('history.clearing' | t) : ('history.clear_all' | t) }}
+      </button>
+    }
+  </div>
+</header>
+
+@if (errorMessage()) {
+  <section class="panel">
+    <div class="error-box">
+      <span class="t-label text-error">[!] {{ errorMessage() }}</span>
+    </div>
+  </section>
+}
+
+@if (isLoading() && audits().length === 0) {
+  <section class="panel">
+    <div class="t-label text-secondary">{{ 'history.refreshing' | t }}...</div>
+  </section>
+}
+
+@if (!isLoading() && audits().length === 0 && !errorMessage()) {
+  <section class="panel">
+    <div class="t-label text-secondary">{{ 'history.no_data' | t }}</div>
+    <p class="t-data text-secondary empty-description">{{ 'history.no_data_desc' | t }}</p>
+  </section>
+}
+
+@if (scoreHistory().length >= 2) {
+  <section class="panel trend-panel">
+    <header class="panel-header">
+      <h2 class="t-heading">{{ 'history.trend' | t }}</h2>
+      <span class="t-label">{{ scoreHistory().length }} {{ 'history.audits' | t }}</span>
+    </header>
+    <div class="trend-chart">
+      <svg [attr.viewBox]="'0 0 ' + chartWidth() + ' 160'" class="trend-svg">
+        @for (i of [0, 1, 2, 3]; track i) {
+          <line
+            [attr.y1]="30 + i * 35"
+            [attr.x1]="40"
+            [attr.y2]="30 + i * 35"
+            [attr.x2]="chartWidth() - 10"
+            stroke="var(--border)"
+            stroke-width="1"
+            stroke-dasharray="4,4"
+          />
+        }
+        <polyline [attr.points]="trendPoints('high')" fill="none" stroke="var(--error)" stroke-width="2" />
+        <polyline [attr.points]="trendPoints('medium')" fill="none" stroke="var(--warning)" stroke-width="2" />
+        <polyline [attr.points]="trendPoints('total')" fill="none" stroke="var(--interactive)" stroke-width="2" />
+        @for (point of scoreHistory(); track $index) {
+          <text
+            [attr.x]="40 + $index * stepX()"
+            y="150"
+            class="trend-label"
+            text-anchor="middle"
+          >{{ point.date.slice(5) }}</text>
+        }
+        <text x="10" y="35" class="trend-label" text-anchor="end">{{ 'history.high' | t }}</text>
+        <text x="10" y="145" class="trend-label" text-anchor="end">{{ 'history.low' | t }}</text>
+      </svg>
+      <div class="trend-legend">
+        <span class="trend-legend-item"><span class="trend-dot" style="background: var(--error)"></span> {{ 'audit.high' | t }}</span>
+        <span class="trend-legend-item"><span class="trend-dot" style="background: var(--warning)"></span> {{ 'audit.medium' | t }}</span>
+        <span class="trend-legend-item"><span class="trend-dot" style="background: var(--interactive)"></span> {{ 'history.total' | t }}</span>
+      </div>
+    </div>
+  </section>
+}
+
+@if (comparisonResult(); as comparison) {
+  <section class="panel compare-panel">
+    <header class="panel-header">
+      <h2 class="t-heading">{{ 'history.comparison' | t }}</h2>
+      <span class="t-label">{{ comparison.diff.length }} {{ 'history.diffs' | t }}</span>
+    </header>
+    <div class="compare-grid">
+      <div class="compare-col">
+        <span class="t-label">A: {{ comparison.a?.created_at?.slice(0, 10) }}</span>
+        <div class="compare-stats">
+          <div><span class="t-data">{{ 'history.high' | t }} {{ compareSeverityCount(comparison.a, 'high') }}</span></div>
+          <div><span class="t-data">{{ 'history.medium' | t }} {{ compareSeverityCount(comparison.a, 'medium') }}</span></div>
+          <div><span class="t-data">{{ 'history.total' | t }} {{ comparison.a?.findings?.length || 0 }}</span></div>
+        </div>
+      </div>
+      <div class="compare-col">
+        <span class="t-label">B: {{ comparison.b?.created_at?.slice(0, 10) }}</span>
+        <div class="compare-stats">
+          <div><span class="t-data">{{ 'history.high' | t }} {{ compareSeverityCount(comparison.b, 'high') }}</span></div>
+          <div><span class="t-data">{{ 'history.medium' | t }} {{ compareSeverityCount(comparison.b, 'medium') }}</span></div>
+          <div><span class="t-data">{{ 'history.total' | t }} {{ comparison.b?.findings?.length || 0 }}</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="compare-diffs">
+      @for (diff of comparison.diff; track $index) {
+        <div
+          class="diff-line t-data"
+          [class.diff-neg]="diff.startsWith('[-]')"
+          [class.diff-pos]="diff.startsWith('[+]')"
+          [class.diff-chg]="diff.startsWith('[~]')"
+        >{{ diff }}</div>
+      }
+      @if (comparison.diff.length === 0) {
+        <div class="t-label text-secondary">{{ 'history.no_diffs' | t }}</div>
+      }
+    </div>
+  </section>
+}
+
+@if (audits().length > 0) {
+  <section class="panel audit-table">
+    <table>
+      <thead>
+        <tr>
+          @if (compareMode()) {
+            <th class="t-label">{{ 'history.select' | t }}</th>
+          }
+          <th class="t-label">{{ 'history.url' | t }}</th>
+          <th class="t-label">{{ 'history.status' | t }}</th>
+          <th class="t-label">{{ 'history.findings' | t }}</th>
+          <th class="t-label">{{ 'history.date' | t }}</th>
+          <th class="t-label"></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (audit of audits(); track audit.id) {
+          <tr [class.selected]="selectedIds().has(audit.id)">
+            @if (compareMode()) {
+              <td>
+                <button
+                  type="button"
+                  class="select-btn t-label"
+                  [class.active]="selectedIds().has(audit.id)"
+                  (click)="toggleSelection(audit.id)"
+                >{{ selectedIds().has(audit.id) ? '×' : '+' }}</button>
+              </td>
+            }
+            <td class="t-data">{{ audit.url }}</td>
+            <td><app-status-badge [status]="audit.status" /></td>
+            <td class="t-data">{{ audit.findings.length }}</td>
+            <td class="t-data">{{ audit.created_at }}</td>
+            <td>
+              <a [routerLink]="'/audit'" [queryParams]="{ load: audit.id }" class="t-label load-link">{{ 'history.load' | t }}</a>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </section>
+}
