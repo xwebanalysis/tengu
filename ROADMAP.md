@@ -3,14 +3,19 @@
 This document tracks the strategic steps required to evolve Tengu into a full-scale web quality auditing platform.
 This file is formatted to be synced automatically with GitHub Issues using the `xgh` roadmap standard.
 
+> Status: 2026-09-12 — backend `0.2.0` (Axum 0.8, SQLite-first, xwa-sdk contracts).
+> Frontend on Angular 22 (zoneless, Vitest, Nothing Design) consuming the xwa-sdk `Event` protocol.
+
 ## Core Engine <!-- phase:core -->
 
-- [ ] HTTP client with configurable timeouts, redirect handling, and retry logic
-- [ ] HTML parser with DOM tree extraction and serialization
-- [ ] URL normalization and canonicalization
+- [x] HTTP client with configurable timeouts, redirect handling, and retry logic (exponential backoff + jitter, `TENGU_HTTP_RETRY`)
+- [x] HTML parser with DOM tree extraction and serialization
+- [x] URL normalization and canonicalization
 - [x] Batch URL analysis from sitemap, CSV, or single entry
-- [ ] Crawl mode for full-site auditing with depth/pages configuration
-- [ ] Request watermarking (request ID, timestamp, duration per analysis)
+- [x] Crawl mode for full-site auditing with depth/pages configuration (`TENGU_CRAWL_DEPTH`, `TENGU_MAX_PAGES`)
+- [x] Request watermarking (request ID, timestamp per analysis)
+- [x] `robots.txt` respected by default with jittered 200–800 ms crawl delay
+- [x] Bounded concurrency (`TENGU_MAX_CONCURRENT`) and cancel-on-disconnect
 
 ## Performance Analysis <!-- phase:performance -->
 
@@ -48,7 +53,7 @@ This file is formatted to be synced automatically with GitHub Issues using the `
 - [x] Heading structure and document outline validation
 - [x] ARIA attribute usage audit (roles, labels, descriptions)
 - [x] Landmark element detection and structure analysis
-- [x] Color contrast ratio calculation (WCAG AA/AAA compliance) — inline, <style> rules, inherited, themes, bg-image detection
+- [x] Color contrast ratio calculation (WCAG AA/AAA compliance)
 - [x] Keyboard navigation audit (focusable elements, tab order, focus indicators)
 - [x] Form label association validation (label-for, aria-label, aria-labelledby)
 - [x] Video/audio transcript and caption detection
@@ -61,31 +66,41 @@ This file is formatted to be synced automatically with GitHub Issues using the `
 
 ## Best Practices & Compliance <!-- phase:best-practices -->
 
-- [x] HTTPS enforcement and certificate validity audit
+- [x] HTTPS enforcement audit
 - [x] Security headers audit (HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy)
 - [x] Cookie audit (Secure, HttpOnly, SameSite attributes, third-party cookies)
-- [ ] GDPR cookie consent banner detection and pattern analysis
+- [x] GDPR cookie consent banner detection and pattern analysis
 - [x] Doctype and HTML validation (W3C standards compliance)
 - [x] Deprecated HTML element and attribute detection
 - [x] Mixed content detection (HTTPS page loading HTTP resources)
 - [x] Subresource Integrity (SRI) audit for external scripts and stylesheets
 - [x] Console error detection (noted: requires browser runtime)
 - [x] Content Security Policy parsing and directive coverage analysis
-- [x] Permissions-Policy / Feature-Policy audit (camera, microphone, geolocation usage)
-- [x] GDPR cookie consent banner detection and pattern analysis
+- [x] Permissions-Policy / Feature-Policy audit
+
+## Backend API <!-- phase:backend -->
+
+- [x] Axum project scaffold with JSON `/api/health` (`status`, `service`, `version`, `database`)
+- [x] REST endpoints for audit CRUD (list/get/delete/clear/import/export)
+- [x] WebSocket endpoint for real-time audit streaming (`/api/audit/live`)
+- [x] SQLite persistence by default (WAL, `busy_timeout`, write-through, `schema_meta`)
+- [x] Optional PostgreSQL backend behind `--features pg` (write-through)
+- [x] Database export/import following the XWA pattern
+- [x] xwa-sdk `Event`/`Analysis`/`Finding` contracts over REST and WS
+- [x] Server-side export `format=json|csv` with `Content-Disposition`
+- [ ] Long-running task queue (audits run in-process, bounded by a semaphore)
 
 ## Web Interface <!-- phase:web-ui -->
 
-- [x] Angular standalone project scaffold with Nothing Design tokens
+- [x] Angular 22 standalone project with Nothing Design tokens (zoneless, Vitest)
 - [x] Audit configuration form (URL input, category toggles, crawl depth)
-- [x] Real-time audit progress via WebSocket streaming
+- [x] Real-time progress via WebSocket (xwa-sdk `Event` envelopes)
 - [x] Score dashboard with per-category breakdown
 - [x] Detailed findings list with severity, category, and check-level filtering
-- [x] HTML source snippets for each finding with line highlighting
-- [x] History page with past audit results
-- [x] Sidebar navigation (TENGU / XWA - MODULE)
+- [x] HTML source snippets with line highlighting
+- [x] History page with past audit results, comparison and severity trend
 - [x] Dark/light theme toggle
-- [x] Terminal panel showing real-time scan progress
+- [x] Self-hosted fonts (Doto, Space Grotesk, Space Mono) and `environment.ts` URLs
 
 ## Reporting <!-- phase:reporting -->
 
@@ -98,27 +113,20 @@ This file is formatted to be synced automatically with GitHub Issues using the `
 - [x] Lighthouse-compatible JSON output format
 - [x] Comparison report between two audits (before/after)
 
-## Backend API <!-- phase:backend -->
-
-- [ ] FastAPI project scaffold with health check endpoint
-- [ ] REST endpoints for audit CRUD (POST /api/audit, GET /api/audits, GET /api/audits/{id}, DELETE /api/audits/{id})
-- [ ] WebSocket endpoint for real-time audit streaming (/api/audit/live)
-- [ ] PostgreSQL models for audits, findings, and pages
-- [ ] Database export (raw + encrypted) following Samurai pattern
-- [ ] Celery or asyncio task queue for long-running audits
-
 ## Integration <!-- phase:xwa -->
 
+- [x] xwa-sdk 0.2.0 contracts (`Analysis`, `Finding`, `Error`, `Summary`, `Event`)
 - [ ] Shared Nothing Design component library with Samurai
-- [ ] Cross-compatible database schema conventions
 - [ ] Unified XWA docker-compose orchestration
 - [ ] XWA API gateway integration
 
 ## Production Hardening <!-- phase:production -->
 
-- [ ] Authentication middleware for API endpoints
-- [ ] Rate limiting for audit requests
-- [x] Audit history retention policies and cleanup (TENGU_MAX_HISTORY env var)
-- [x] Structured logging with request tracing (tracing crate with request watermarking)
-- [ ] Prometheus metrics endpoint
-- [x] Docker multi-stage build for minimal image size
+- [x] Authentication middleware for API endpoints (`TENGU_API_KEY`, header-first)
+- [x] Rate limiting for REST and WebSocket requests (120 req/min default)
+- [x] Audit history retention policies and cleanup (`TENGU_MAX_HISTORY`)
+- [x] Structured logging with request watermarking (`tracing`)
+- [x] Prometheus metrics endpoint (`/api/metrics`)
+- [x] Docker multi-stage build and compose with persistent SQLite volume
+- [x] Configurable CORS (`XWA_CORS_ORIGINS`, credentials disabled)
+- [x] Zero compiler warnings; fmt/clippy/tests green

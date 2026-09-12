@@ -4,8 +4,8 @@ use scraper::{ElementRef, Html};
 use std::fmt::Write;
 
 const VOID_ELEMENTS: &[&str] = &[
-    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta",
-    "param", "source", "track", "wbr",
+    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
+    "track", "wbr",
 ];
 
 fn is_void(name: &str) -> bool {
@@ -44,7 +44,7 @@ fn pretty_node(node: &NodeRef<'_, Node>, depth: usize, output: &mut String) {
             let _ = writeln!(output, "{}<!-- {} -->", indent, comment.comment.trim());
         }
         Node::Element(_) => {
-            if let Some(el) = ElementRef::wrap(node.clone()) {
+            if let Some(el) = ElementRef::wrap(*node) {
                 let tag = el.value().name();
                 let attrs = render_attrs(&el);
                 let indent = "  ".repeat(depth);
@@ -71,7 +71,7 @@ fn pretty_node(node: &NodeRef<'_, Node>, depth: usize, output: &mut String) {
                         .map(|c| {
                             if let Node::Text(t) = c.value() {
                                 t.text.trim().to_string()
-                            } else if let Some(child_el) = ElementRef::wrap(c.clone()) {
+                            } else if let Some(child_el) = ElementRef::wrap(*c) {
                                 let c_tag = child_el.value().name();
                                 let c_attrs = render_attrs(&child_el);
                                 if is_void(c_tag) {
@@ -94,11 +94,7 @@ fn pretty_node(node: &NodeRef<'_, Node>, depth: usize, output: &mut String) {
                             }
                         })
                         .collect();
-                    let _ = writeln!(
-                        output,
-                        "{}<{}{}>{}</{}>",
-                        indent, tag, attrs, inner, tag
-                    );
+                    let _ = writeln!(output, "{}<{}{}>{}</{}>", indent, tag, attrs, inner, tag);
                 } else {
                     let _ = writeln!(output, "{}<{}{}>", indent, tag, attrs);
                     for child in &children {

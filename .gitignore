@@ -12,6 +12,11 @@ static/
 # Generated exports
 exports/
 
+# SQLite database (WAL mode)
+tengu.db
+tengu.db-wal
+tengu.db-shm
+
 # Environment / secrets
 .env
 .env.local

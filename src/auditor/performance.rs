@@ -55,20 +55,15 @@ fn page_weight_audit(html: &str, findings: &mut Vec<Finding>) {
     } else if size_kb > 500.0 {
         (
             Severity::Warning,
-            format!(
-                "is between 500 KB and 2 MB — large but not critical",
-            ),
+            "is between 500 KB and 2 MB — large but not critical".to_string(),
         )
     } else if size_kb > 100.0 {
         (
             Severity::Info,
-            format!("is between 100 KB and 500 KB — acceptable"),
+            "is between 100 KB and 500 KB — acceptable".to_string(),
         )
     } else {
-        (
-            Severity::Pass,
-            format!("is under 100 KB — ideal"),
-        )
+        (Severity::Pass, "is under 100 KB — ideal".to_string())
     };
 
     let snippet = if size_bytes > 300 {
@@ -167,10 +162,7 @@ fn resource_analysis(document: &Html, findings: &mut Vec<Finding>) {
     } else {
         (
             Severity::Info,
-            format!(
-                "The page loads {} external resources.",
-                total
-            ),
+            format!("The page loads {} external resources.", total),
         )
     };
 
@@ -207,12 +199,7 @@ fn resource_analysis(document: &Html, findings: &mut Vec<Finding>) {
              · Replace icon fonts with inline SVG sprites.\n  \
              · Remove unused CSS/JS — use coverage tools in DevTools to identify them.\n  \
              · Use code splitting for JavaScript to deliver only what the current route needs.",
-            threshold_note,
-            css_count,
-            js_count,
-            img_count,
-            iframe_count,
-            fetch_count,
+            threshold_note, css_count, js_count, img_count, iframe_count, fetch_count,
         ),
         snippet,
         page_url: None,
@@ -236,14 +223,14 @@ fn image_audit(document: &Html, findings: &mut Vec<Finding>) {
         if img.value().attr("width").is_none() && img.value().attr("height").is_none() {
             no_dim_count += 1;
             if no_dim_examples.len() < 3 {
-                no_dim_examples.push(img.clone());
+                no_dim_examples.push(img);
             }
         }
 
         if img.value().attr("loading").is_none() && !src.starts_with("data:") {
             no_lazy_count += 1;
             if no_lazy_examples.len() < 3 {
-                no_lazy_examples.push(img.clone());
+                no_lazy_examples.push(img);
             }
         }
     }
@@ -290,7 +277,8 @@ fn image_audit(document: &Html, findings: &mut Vec<Finding>) {
                  <img src=\"example.jpg\" width=\"800\" height=\"600\" alt=\"...\">\n\n\
                  Alternatively, use CSS aspect-ratio combined with responsive sizing:\n  \
                  img {{ aspect-ratio: 800 / 600; width: 100%; height: auto; }}",
-                no_dim_count, total,
+                no_dim_count,
+                total,
                 lines.join("\n"),
             ),
             snippet,
@@ -339,10 +327,7 @@ fn image_audit(document: &Html, findings: &mut Vec<Finding>) {
 
 fn font_audit(document: &Html, findings: &mut Vec<Finding>) {
     let font_sel = Selector::parse("link[rel=preload][as=font]").unwrap();
-    let google_font_sel = Selector::parse(
-        "link[href*=\"fonts.googleapis.com\"]",
-    )
-    .unwrap();
+    let google_font_sel = Selector::parse("link[href*=\"fonts.googleapis.com\"]").unwrap();
     let style_sel = Selector::parse("style").unwrap();
     let preconnect_google = Selector::parse(
         "link[rel=preconnect][href*=\"fonts.googleapis.com\"], \
@@ -353,7 +338,9 @@ fn font_audit(document: &Html, findings: &mut Vec<Finding>) {
 
     let has_font_preload = document.select(&font_sel).next().is_some();
     let has_google_fonts = document.select(&google_font_sel).next().is_some();
-    let has_font_face = document.select(&style_sel).any(|el| el.inner_html().contains("@font-face"));
+    let has_font_face = document
+        .select(&style_sel)
+        .any(|el| el.inner_html().contains("@font-face"));
     let has_preconnect_google = document.select(&preconnect_google).next().is_some();
     let preconnect_count = document.select(&preconnect_any).count();
 
@@ -423,7 +410,10 @@ fn font_audit(document: &Html, findings: &mut Vec<Finding>) {
     }
 
     if has_font_face && preconnect_count == 0 {
-        let el = document.select(&style_sel).find(|el| el.inner_html().contains("@font-face")).unwrap();
+        let el = document
+            .select(&style_sel)
+            .find(|el| el.inner_html().contains("@font-face"))
+            .unwrap();
         let snippet = el_snippet(&el);
 
         findings.push(Finding {
@@ -431,26 +421,22 @@ fn font_audit(document: &Html, findings: &mut Vec<Finding>) {
             check: "font_loading".to_string(),
             severity: Severity::Info,
             title: "@font-face used without preconnect to font origins".into(),
-            description: format!(
-                "The page includes @font-face declarations but has no \
+            description: "The page includes @font-face declarations but has no \
                  `<link rel=\"preconnect\">` hints for the font file origins. \
                  If fonts are hosted on a different origin (CDN, Google Fonts, \
                  Typekit), the browser must go through the full connection setup \
                  before it can start downloading the font files.\n\n\
                  Recommendation: Add preconnect hints for each font origin in <head>:\n  \
                  <link rel=\"preconnect\" href=\"https://fonts.example.com\" crossorigin>\n\n\
-                 For self-hosted fonts (same origin), this is not needed.",
-            ),
+                 For self-hosted fonts (same origin), this is not needed."
+                .to_string(),
             snippet,
             page_url: None,
         });
     }
 
     if !has_google_fonts && !has_font_face {
-        let total_sel = Selector::parse(
-            "*[style*=\"font-family\"]:not(html):not(body)",
-        )
-        .unwrap();
+        let total_sel = Selector::parse("*[style*=\"font-family\"]:not(html):not(body)").unwrap();
         let styled_count = document.select(&total_sel).count();
 
         if styled_count > 0 {
@@ -461,7 +447,7 @@ fn font_audit(document: &Html, findings: &mut Vec<Finding>) {
                 check: "font_loading".to_string(),
                 severity: Severity::Pass,
                 title: "No web fonts detected — system fonts in use".into(),
-                description: format!(
+                description:
                     "The page does not load any web fonts via @font-face or Google Fonts. \
                      It relies on system fonts (e.g., Arial, Helvetica, system-ui). \
                      This is optimal for performance because:\n\n  \
@@ -472,8 +458,8 @@ fn font_audit(document: &Html, findings: &mut Vec<Finding>) {
                      If custom branding is required, consider:\n  \
                      · Using variable fonts (one file, multiple weights/styles)\n  \
                      · Subsetting fonts to include only the characters you need\n  \
-                     · Using woff2 format for best compression (~30% smaller than woff)",
-                ),
+                     · Using woff2 format for best compression (~30% smaller than woff)"
+                        .to_string(),
                 snippet,
                 page_url: None,
             });
@@ -482,25 +468,19 @@ fn font_audit(document: &Html, findings: &mut Vec<Finding>) {
 }
 
 fn cache_header_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
-    let cache_control = headers
-        .get("cache-control")
-        .and_then(|v| v.to_str().ok());
-    let etag = headers
-        .get("etag")
-        .and_then(|v| v.to_str().ok());
-    let last_modified = headers
-        .get("last-modified")
-        .and_then(|v| v.to_str().ok());
-    let expires = headers
-        .get("expires")
-        .and_then(|v| v.to_str().ok());
-    let pragma = headers
-        .get("pragma")
-        .and_then(|v| v.to_str().ok());
+    let cache_control = headers.get("cache-control").and_then(|v| v.to_str().ok());
+    let etag = headers.get("etag").and_then(|v| v.to_str().ok());
+    let last_modified = headers.get("last-modified").and_then(|v| v.to_str().ok());
+    let expires = headers.get("expires").and_then(|v| v.to_str().ok());
+    let pragma = headers.get("pragma").and_then(|v| v.to_str().ok());
 
     if let Some(cc) = cache_control {
         let lower = cc.to_lowercase();
-        if !lower.contains("max-age") && !lower.contains("s-maxage") && !lower.contains("no-cache") && !lower.contains("no-store") {
+        if !lower.contains("max-age")
+            && !lower.contains("s-maxage")
+            && !lower.contains("no-cache")
+            && !lower.contains("no-store")
+        {
             findings.push(Finding {
                 category: "performance".to_string(),
                 check: "cache_policy".to_string(),
@@ -520,8 +500,7 @@ fn cache_header_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
                      · For API responses that should never be cached:\n    \
                      Cache-Control: no-store\n\n\
                      Current value: {}",
-                    cc,
-                    cc,
+                    cc, cc,
                 ),
                 snippet: Some(format!("Cache-Control: {}", cc)),
                 page_url: None,
@@ -567,16 +546,13 @@ fn cache_header_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
     }
 
     if etag.is_none() && last_modified.is_none() {
-        let snippet = Some(
-            "ETag: \"<file-hash>\"\nLast-Modified: <HTTP-date>".to_string(),
-        );
+        let snippet = Some("ETag: \"<file-hash>\"\nLast-Modified: <HTTP-date>".to_string());
         findings.push(Finding {
             category: "performance".to_string(),
             check: "cache_policy".to_string(),
             severity: Severity::Info,
             title: "No conditional request headers (ETag or Last-Modified)".into(),
-            description: format!(
-                "The response has neither an ETag nor a Last-Modified header. \
+            description: "The response has neither an ETag nor a Last-Modified header. \
                  Without these, conditional requests (If-None-Match and \
                  If-Modified-Since) cannot be used. Every request results in a full \
                  200 response with the complete body, even when the resource has not \
@@ -594,8 +570,8 @@ fn cache_header_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
                  Example: Last-Modified: Wed, 21 Oct 2025 07:28:00 GMT\n\n\
                  Note: If both are present, ETag takes precedence. \
                  Weak ETags (W/\"...\") allow semantically equivalent responses \
-                 to be considered unchanged even if bytes differ.",
-            ),
+                 to be considered unchanged even if bytes differ."
+                .to_string(),
             snippet,
             page_url: None,
         });
@@ -620,8 +596,7 @@ fn cache_header_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
                  Recommendation: Replace Expires with Cache-Control max-age:\n  \
                  Cache-Control: public, max-age=31536000\n\n\
                  Current value: {}",
-                exp,
-                exp,
+                exp, exp,
             ),
             snippet,
             page_url: None,
@@ -637,12 +612,8 @@ fn compression_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
         .get("content-type")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("unknown");
-    let vary = headers
-        .get("vary")
-        .and_then(|v| v.to_str().ok());
-    let content_length = headers
-        .get("content-length")
-        .and_then(|v| v.to_str().ok());
+    let vary = headers.get("vary").and_then(|v| v.to_str().ok());
+    let content_length = headers.get("content-length").and_then(|v| v.to_str().ok());
 
     match content_encoding {
         Some("br") => {
@@ -696,7 +667,11 @@ fn compression_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
                      Current response type: {}\n\
                      Content-Length{}: {}",
                     content_type,
-                    if content_length.is_some() { "" } else { " missing" },
+                    if content_length.is_some() {
+                        ""
+                    } else {
+                        " missing"
+                    },
                     content_length.unwrap_or("(unknown)"),
                 ),
                 snippet,
@@ -758,7 +733,11 @@ fn compression_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
                      Current response type: {}\n\
                      Content-Length{}: {}",
                     content_type,
-                    if content_length.is_some() { "" } else { " missing" },
+                    if content_length.is_some() {
+                        ""
+                    } else {
+                        " missing"
+                    },
                     content_length.unwrap_or("(unknown)"),
                 ),
                 snippet,
@@ -769,20 +748,13 @@ fn compression_audit(headers: &HeaderMap, findings: &mut Vec<Finding>) {
 }
 
 fn render_blocking_audit(document: &Html, findings: &mut Vec<Finding>) {
-    let sync_css_sel = Selector::parse(
-        "link[rel=stylesheet]:not([media=print]):not([disabled])",
-    )
-    .unwrap();
-    let sync_js_sel = Selector::parse(
-        "script[src]:not([defer]):not([async]):not([type=module])",
-    )
-    .unwrap();
+    let sync_css_sel =
+        Selector::parse("link[rel=stylesheet]:not([media=print]):not([disabled])").unwrap();
+    let sync_js_sel =
+        Selector::parse("script[src]:not([defer]):not([async]):not([type=module])").unwrap();
     let inline_style_sel = Selector::parse("style:not([media=print])").unwrap();
     let import_style_sel = Selector::parse("style").unwrap();
-    let import_link_sel = Selector::parse(
-        "link[href*=\".css\"]:not([rel=preload])",
-    )
-    .unwrap();
+    let import_link_sel = Selector::parse("link[href*=\".css\"]:not([rel=preload])").unwrap();
 
     let blocking_css: Vec<ElementRef> = document.select(&sync_css_sel).collect();
     let blocking_js: Vec<ElementRef> = document.select(&sync_js_sel).collect();
@@ -843,10 +815,7 @@ fn render_blocking_audit(document: &Html, findings: &mut Vec<Finding>) {
     } else {
         (
             Severity::Info,
-            format!(
-                "{} render-blocking resource(s).",
-                total_blocking,
-            ),
+            format!("{} render-blocking resource(s).", total_blocking,),
         )
     };
 
@@ -900,11 +869,7 @@ fn render_blocking_audit(document: &Html, findings: &mut Vec<Finding>) {
              multiple <link> tags instead\n  \
              6. Use HTTP/2 Push or 103 Early Hints to deliver critical resources \
              before the browser requests them",
-            severity_note,
-            css_count,
-            js_count,
-            inline_count,
-            import_count,
+            severity_note, css_count, js_count, inline_count, import_count,
         ),
         snippet,
         page_url: None,
@@ -917,8 +882,7 @@ fn web_vitals_note(findings: &mut Vec<Finding>) {
         check: "web_vitals".to_string(),
         severity: Severity::Info,
         title: "LCP, CLS, and INP require a browser-based audit".into(),
-        description: format!(
-            "Tengu's server-side HTML fetch cannot measure Core Web Vitals because they require \
+        description: "Tengu's server-side HTML fetch cannot measure Core Web Vitals because they require \
              a real browser to render, paint, and interact with the page.\n\n\
              What each metric measures:\n  \
              · LCP (Largest Contentful Paint) — When the largest content element becomes visible. \
@@ -940,8 +904,7 @@ fn web_vitals_note(findings: &mut Vec<Finding>) {
              · Image audit — setting dimensions prevents CLS\n  \
              · Font audit — font-display: swap prevents invisible text\n  \
              · Cache audit — caching improves repeat-visit LCP\n\n\
-             Reference: web.dev/vitals, Chrome UX Report, W3C Web Performance WG"
-        ),
+             Reference: web.dev/vitals, Chrome UX Report, W3C Web Performance WG".to_string(),
         snippet: None,
         page_url: None,
     });
@@ -990,7 +953,6 @@ fn third_party_script_audit(document: &Html, findings: &mut Vec<Finding>) {
         ("2o7.net", "Adobe Analytics"),
         ("omniture.com", "Adobe Analytics"),
         ("sc.omtrdc.net", "Adobe Analytics"),
-
         // Tag managers
         ("tagmanager.google.com", "Google Tag Manager"),
         ("cdn.optimizely.com", "Optimizely"),
@@ -1000,7 +962,6 @@ fn third_party_script_audit(document: &Html, findings: &mut Vec<Finding>) {
         ("tiqcdn.com", "Tealium"),
         ("ensighten.com", "Ensighten"),
         ("cdn.ensighten.com", "Ensighten"),
-
         // Fonts & CDNs
         ("fonts.googleapis.com", "Google Fonts"),
         ("fonts.gstatic.com", "Google Fonts (static)"),
@@ -1017,7 +978,6 @@ fn third_party_script_audit(document: &Html, findings: &mut Vec<Finding>) {
         ("ajax.googleapis.com", "Google AJAX Libraries"),
         ("ajax.aspnetcdn.com", "Microsoft Ajax CDN"),
         ("cdn.socket.io", "Socket.io CDN"),
-
         // Recaptcha & anti-bot
         ("google.com/recaptcha", "reCAPTCHA"),
         ("recaptcha.net", "reCAPTCHA"),
@@ -1025,7 +985,6 @@ fn third_party_script_audit(document: &Html, findings: &mut Vec<Finding>) {
         ("js.hcaptcha.com", "hCaptcha"),
         ("api.turn.com", "Turnstile"),
         ("challenges.cloudflare.com", "Cloudflare Turnstile"),
-
         // Payments
         ("stripe.com", "Stripe"),
         ("js.stripe.com", "Stripe.js"),
@@ -1036,7 +995,6 @@ fn third_party_script_audit(document: &Html, findings: &mut Vec<Finding>) {
         ("js.squareup.com", "Square SDK"),
         ("braintreegateway.com", "Braintree"),
         ("js.braintreegateway.com", "Braintree JS"),
-
         // Maps
         ("maps.googleapis.com", "Google Maps"),
         ("maps.google.com", "Google Maps"),
@@ -1044,7 +1002,6 @@ fn third_party_script_audit(document: &Html, findings: &mut Vec<Finding>) {
         ("mapbox.com", "Mapbox"),
         ("api.mapbox.com", "Mapbox API"),
         ("openstreetmap.org", "OpenStreetMap"),
-
         // Social
         ("platform.twitter.com", "Twitter Platform"),
         ("platform.linkedin.com", "LinkedIn Platform"),
@@ -1054,7 +1011,6 @@ fn third_party_script_audit(document: &Html, findings: &mut Vec<Finding>) {
         ("www.youtube-nocookie.com", "YouTube (privacy)"),
         ("player.vimeo.com", "Vimeo"),
         ("i.ytimg.com", "YouTube Thumbnails"),
-
         // Chat & support
         ("intercom.io", "Intercom"),
         ("widget.intercom.io", "Intercom Widget"),
@@ -1075,14 +1031,12 @@ fn third_party_script_audit(document: &Html, findings: &mut Vec<Finding>) {
         ("static.olark.com", "Olark"),
         ("freshdesk.com", "Freshdesk"),
         ("freshworks.com", "Freshworks"),
-
         // A/B testing
         ("app.launchdarkly.com", "LaunchDarkly"),
         ("client.launchdarkly.com", "LaunchDarkly Client"),
         ("cdn.launchdarkly.com", "LaunchDarkly CDN"),
         ("split.io", "Split.io"),
         ("cdn.split.io", "Split.io"),
-
         // Video
         ("cdn.embedly.com", "Embedly"),
         ("cdn.video", "Video CDN"),
@@ -1091,7 +1045,6 @@ fn third_party_script_audit(document: &Html, findings: &mut Vec<Finding>) {
         ("wistia.com", "Wistia"),
         ("fast.wistia.com", "Wistia"),
         ("cdn.wistia.com", "Wistia"),
-
         // Security
         ("cdn.sitespect.com", "SiteSpect"),
         ("cdn.sucuri.net", "Sucuri"),
@@ -1099,7 +1052,6 @@ fn third_party_script_audit(document: &Html, findings: &mut Vec<Finding>) {
         ("cloudflare.com", "Cloudflare"),
         ("cdn.cloudflare.com", "Cloudflare CDN"),
         ("cdnjs.cloudflare.com", "Cloudflare CDNjs"),
-
         // Other common
         ("gstatic.com", "Google Static"),
         ("www.gstatic.com", "Google Static"),
@@ -1152,11 +1104,16 @@ fn third_party_script_audit(document: &Html, findings: &mut Vec<Finding>) {
     let grouped: Vec<String> = {
         let mut seen: Vec<&str> = Vec::new();
         let mut lines = Vec::new();
-        for (name, src) in &third_party {
+        for (name, _src) in &third_party {
             if !seen.contains(&name.as_str()) {
                 seen.push(name.as_str());
                 let count = third_party.iter().filter(|(n, _)| n == name).count();
-                lines.push(format!("  · {} ({} script{})", name, count, if count == 1 { "" } else { "s" }));
+                lines.push(format!(
+                    "  · {} ({} script{})",
+                    name,
+                    count,
+                    if count == 1 { "" } else { "s" }
+                ));
             }
         }
         lines.truncate(10);
@@ -1167,7 +1124,11 @@ fn third_party_script_audit(document: &Html, findings: &mut Vec<Finding>) {
         category: "performance".to_string(),
         check: "third_party_scripts".to_string(),
         severity,
-        title: format!("{} third-party script(s) detected — impact: {}", third_party.len(), impact),
+        title: format!(
+            "{} third-party script(s) detected — impact: {}",
+            third_party.len(),
+            impact
+        ),
         description: format!(
             "The page loads {} third-party script(s) from known external services. Each \
              third-party script adds DNS resolution, TCP/TLS handshake, download time, and \
@@ -1196,4 +1157,42 @@ fn third_party_script_audit(document: &Html, findings: &mut Vec<Finding>) {
         snippet: None,
         page_url: None,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FIXTURE: &str = r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Fixture</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/vendor.js"></script>
+</head>
+<body>
+  <h1>Hello</h1>
+  <img src="/hero.png">
+  <script src="/app.js" defer></script>
+</body>
+</html>"#;
+
+    #[tokio::test]
+    async fn performance_analyze_returns_contract_findings() {
+        let findings = analyze(FIXTURE, &HeaderMap::new()).await;
+        assert!(!findings.is_empty(), "fixture should produce findings");
+        assert!(
+            findings.iter().all(|f| f.category == "performance"),
+            "all findings must be tagged performance"
+        );
+        let checks: Vec<&str> = findings.iter().map(|f| f.check.as_str()).collect();
+        assert!(
+            checks.contains(&"render_blocking")
+                || checks.contains(&"image_optimization")
+                || checks.contains(&"page_weight")
+                || checks.contains(&"resource_waterfall"),
+            "unexpected checks: {checks:?}"
+        );
+    }
 }

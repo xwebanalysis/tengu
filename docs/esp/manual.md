@@ -2,39 +2,61 @@
 
 ## Despliegue
 
-### Docker (recomendado)
+### Local (por defecto, SQLite)
+
+```bash
+./tengu.sh            # ./tengu.sh local
+```
+
+Servidor Axum nativo en `http://localhost:8070` con SQLite en
+`<repo>/tengu.db` (configurable con `TENGU_DB_PATH`).
+
+### Docker (volumen SQLite persistente)
 
 ```bash
 docker compose up -d --build
 ```
 
-Interfaz web en `http://localhost:8080`.
+Interfaz web en `http://localhost:8070`; base de datos en `/data/tengu.db`.
 
 ### Standalone
 
 ```bash
-cargo run --release
+TENGU_DB_PATH=/tmp/tengu.db PORT=8070 cargo run --release
 ```
 
-Requiere Rust toolchain 1.81+. El frontend se compila automaticamente durante el build. Interfaz web en `http://localhost:8080`.
+Requiere Rust 1.86+. `build.rs` **no** compila el frontend: solo declara rutas
+`rerun-if-changed`. Para construir la UI usa `./tengu.sh build` o, dentro de
+`frontend/`, `npm ci && npm run build` con Node 24 (Angular 22 + Nothing
+Design; la salida va a `../static`). `npm test` ejecuta la suite Vitest.
+Interfaz web en `http://localhost:8070`.
 
 ### Script de Inicio
 
 ```bash
-./tengu.sh                       # Standalone efimero (sin estado en disco)
-./tengu.sh --docker               # via docker-compose
-./tengu.sh --docker -e            # Docker efimero (--rm, limpia automaticamente)
-./tengu.sh --export archivo.json  # Guardar exportacion en ./exports/
-./tengu.sh --import archivo.json  # Importar JSON de auditoria
-./tengu.sh --build                # Solo compilar (sin ejecutar)
+./tengu.sh                        # local (por defecto): SQLite nativo :8070
+./tengu.sh local                  # igual que arriba
+./tengu.sh docker                 # via docker-compose
+./tengu.sh docker --rm            # Docker efimero (--rm, limpia automaticamente)
+./tengu.sh export [archivo]       # Guardar exportacion en ./exports/
+./tengu.sh import archivo.json    # Importar JSON de auditoria
+./tengu.sh build                  # Solo compilar el frontend
+./tengu.sh -b                     # Forzar rebuild del frontend al arrancar
 ```
 
 ## Variables de Entorno
 
 | Variable | Por Defecto | Descripcion |
 |---|---|---|
-| `PORT` | `8080` | Puerto de escucha HTTP |
-| `RUST_LOG` | `tengu=info,tower_http=info` | Verbosidad de logging (formato env-filter) |
+| `PORT` | `8070` | Puerto de escucha HTTP |
+| `TENGU_DB_PATH` | `tengu.db` (`/data/tengu.db` en Docker) | Fichero SQLite |
+| `DATABASE_URL` | — | DSN PostgreSQL (requiere `--features pg`) |
+| `TENGU_MAX_HISTORY` | `100` | Auditorias persistidas maximas |
+| `TENGU_MAX_PAGES` / `TENGU_CRAWL_DEPTH` | `50` / `2` | Limites de crawl |
+| `TENGU_ROBOTS_TXT` | `1` | Respetar robots.txt (`0` lo desactiva) |
+| `TENGU_RATE_LIMIT_PER_MINUTE` | `120` | Token bucket REST/WS |
+| `XWA_CORS_ORIGINS` | localhost/LAN | Origenes CORS permitidos |
+| `RUST_LOG` | `tengu=info,tower_http=info` | Verbosidad de logging (env-filter) |
 
 ## Uso
 
@@ -43,7 +65,9 @@ Requiere Rust toolchain 1.81+. El frontend se compila automaticamente durante el
 1. Ingresa una URL en el campo de texto
 2. Selecciona las categorias de auditoria (Rendimiento, SEO, Accesibilidad, Buenas Practicas)
 3. Haz clic en START AUDIT
-4. Los resultados se transmiten en tiempo real via WebSocket
+4. Los resultados se transmiten en tiempo real via WebSocket con envelopes
+   `Event` de xwa-sdk (`analysis_started`, `analysis_progress`, `item_found`,
+   `log`, `analysis_completed` / `analysis_error`)
 
 ### Auditoria de Sitio Completo
 
@@ -55,7 +79,7 @@ Requiere Rust toolchain 1.81+. El frontend se compila automaticamente durante el
 ### Interpretacion de Resultados
 
 Cada hallazgo muestra:
-- **Severidad**: Error, Warning, Info o Pass
+- **Severidad**: escala unificada xwa-sdk (`pass`, `info`, `low`, `medium`, `high`, `critical`; el backend mapea `Pass→pass`, `Info→info`, `Warning→medium`, `Error→high`)
 - **Check**: Nombre de la comprobacion especifica
 - **Titulo**: Resumen del problema
 - **Descripcion**: Explicacion detallada con recomendaciones
@@ -68,12 +92,13 @@ Despues de una auditoria, haz clic en VIEW HTML para ver el codigo fuente format
 
 ### Exportacion
 
-Los resultados se pueden exportar en cinco formatos:
+Los resultados se pueden exportar en seis formatos:
 
 | Formato | Extension | Contenido |
 |---|---|---|
 | CSV | `.csv` | Datos tabulares con todos los campos |
 | JSON | `.json` | Payload completo con metadatos |
+| Lighthouse JSON | `.json` | Formato compatible con Lighthouse |
 | PDF | `.pdf` | Informe apaisado con tabla de hallazgos |
 | HTML | `.html` | Informe auto-contenido con estilos |
 | Markdown | `.md` | Informe de texto ligero |
@@ -89,6 +114,10 @@ Los resultados se pueden exportar en cinco formatos:
 | `DELETE` | `/api/audits/:id` | Eliminar auditoria |
 | `GET` | `/api/audits/export` | Exportar todas las auditorias como JSON |
 | `POST` | `/api/audits/import` | Importar auditorias desde JSON |
+| `GET` | `/api/analyses` | Listar analisis (contrato xwa-sdk `Analysis`) |
+| `GET` | `/api/analyses/:id` | Analisis + hallazgos |
+| `DELETE` | `/api/analyses/:id` | Eliminar analisis |
+| `GET` | `/api/analyses/:id/export?format=json\|csv` | Descargar analisis |
 
 ## Solucion de Problemas
 
