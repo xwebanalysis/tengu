@@ -5,6 +5,11 @@ import { RouterLink } from '@angular/router';
 import { ApiService } from '../../core/api.service';
 import { TranslateService } from '../../core/i18n.service';
 import { AnalysisRecord, Severity } from '../../core/models';
+import {
+  XwaChartComponent,
+  XwaChartColorKey,
+  XwaChartDatum,
+} from '../../shared/charts/xwa-chart.component';
 import { TranslatePipe } from '../../shared/pipes/translate.pipe';
 import { StatusBadgeComponent } from '../../shared/status-badge/status-badge';
 
@@ -24,7 +29,7 @@ interface TrendPoint {
 
 @Component({
   selector: 'app-history',
-  imports: [RouterLink, StatusBadgeComponent, TranslatePipe],
+  imports: [RouterLink, StatusBadgeComponent, TranslatePipe, XwaChartComponent],
   templateUrl: './history.html',
   styleUrl: './history.scss',
 })
@@ -52,6 +57,32 @@ export class HistoryComponent implements OnInit {
         medium: this.severityCount(audit, 'medium'),
       })),
   );
+
+  /** XWA line chart: audits per day (sorted oldest to newest). */
+  readonly auditsPerDayData = computed<XwaChartDatum[]>(() => {
+    const byDay = new Map<string, number>();
+    for (const audit of this.audits()) {
+      const day = String(audit.created_at || '').slice(0, 10) || 'UNKNOWN';
+      byDay.set(day, (byDay.get(day) ?? 0) + 1);
+    }
+    return [...byDay.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([label, value]) => ({ label, value }));
+  });
+
+  /** XWA donut: status distribution. */
+  readonly statusChartData = computed<XwaChartDatum[]>(() => {
+    const counts = new Map<string, number>();
+    for (const audit of this.audits()) {
+      const key = String(audit.status || 'UNKNOWN').toUpperCase();
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return [...counts.entries()].map(([label, value]) => ({
+      label,
+      value,
+      color: this.statusChartColor(label),
+    }));
+  });
 
   readonly maxScore = computed(() => {
     const history = this.scoreHistory();
@@ -193,6 +224,19 @@ export class HistoryComponent implements OnInit {
 
   private severityCount(record: AnalysisRecord, severity: Severity): number {
     return record.findings.filter((finding) => finding.severity === severity).length;
+  }
+
+  private statusChartColor(status: string): XwaChartColorKey {
+    if (status === 'COMPLETED') {
+      return 'success';
+    }
+    if (status === 'RUNNING' || status === 'PENDING') {
+      return 'warning';
+    }
+    if (status === 'FAILED' || status === 'CANCELLED' || status === 'ERROR') {
+      return 'critical';
+    }
+    return 'neutral-strong';
   }
 
   private errorDetail(error: unknown): string {

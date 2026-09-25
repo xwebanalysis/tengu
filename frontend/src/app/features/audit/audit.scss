@@ -171,6 +171,27 @@
   margin-bottom: var(--space-lg);
 }
 
+/* --- XWA chart grid --- */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.chart-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  min-width: 0;
+  border: 1px solid var(--border);
+  padding: var(--space-md);
+
+  h2 {
+    margin: 0;
+  }
+}
+
 .empty-results-message {
   padding: var(--space-lg) 0;
 }

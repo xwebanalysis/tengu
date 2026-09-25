@@ -49,6 +49,30 @@
   </section>
 }
 
+@if (!isLoading() && audits().length > 0) {
+  <section class="panel charts-panel">
+    <div class="charts-grid">
+      <div class="chart-block">
+        <h2 class="t-label">{{ 'history.audits_per_day' | t }}</h2>
+        <app-xwa-chart
+          kind="line"
+          [data]="auditsPerDayData()"
+          [title]="'history.audits_per_day' | t"
+        />
+      </div>
+      <div class="chart-block">
+        <h2 class="t-label">{{ 'history.status_distribution' | t }}</h2>
+        <app-xwa-chart
+          kind="donut"
+          [data]="statusChartData()"
+          unit="AUDITS"
+          [title]="'history.status_distribution' | t"
+        />
+      </div>
+    </div>
+  </section>
+}
+
 @if (scoreHistory().length >= 2) {
   <section class="panel trend-panel">
     <header class="panel-header">

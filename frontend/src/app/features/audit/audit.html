@@ -165,6 +165,37 @@
       }
 
       @if (findings().length > 0) {
+        @if (!isRunning()) {
+          <div class="charts-grid">
+            <div class="chart-block">
+              <h2 class="t-label">{{ 'audit.scores' | t }}</h2>
+              <app-xwa-chart
+                kind="bars"
+                [data]="scoreChartData()"
+                unit="%"
+                [title]="'audit.scores' | t"
+              />
+            </div>
+            <div class="chart-block">
+              <h2 class="t-label">{{ 'audit.issues_by_severity' | t }}</h2>
+              <app-xwa-chart
+                kind="h-bars"
+                [data]="severityChartData()"
+                [title]="'audit.issues_by_severity' | t"
+              />
+            </div>
+            <div class="chart-block">
+              <h2 class="t-label">{{ 'audit.issues_by_category' | t }}</h2>
+              <app-xwa-chart
+                kind="donut"
+                [data]="categoryChartData()"
+                unit="ISSUES"
+                [title]="'audit.issues_by_category' | t"
+              />
+            </div>
+          </div>
+        }
+
         <div class="severity-summary">
           @if (summary().high + summary().critical > 0) {
             <app-metric-card
