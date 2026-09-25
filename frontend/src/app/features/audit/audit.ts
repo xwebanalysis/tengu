@@ -14,8 +14,13 @@ import {
 import { ExportService, AuditExportContext } from '../../core/export.service';
 import { TranslateService } from '../../core/i18n.service';
 import { LiveService } from '../../core/live.service';
-import { AuditMode, AuditRequest, FindingView, severityCounts } from '../../core/models';
+import { AuditMode, AuditRequest, FindingView, Severity, severityCounts } from '../../core/models';
 import { htmlLines, locateLine } from '../../core/snippet-locator';
+import {
+  XwaChartComponent,
+  XwaChartColorKey,
+  XwaChartDatum,
+} from '../../shared/charts/xwa-chart.component';
 import { ExportActionsComponent } from '../../shared/export-actions/export-actions';
 import { HtmlViewerComponent } from '../../shared/html-viewer/html-viewer';
 import { MetricCardComponent } from '../../shared/metric-card/metric-card';
@@ -37,6 +42,7 @@ const SELECTED_CHECKS = ['performance', 'seo', 'accessibility', 'best_practices'
     SeverityTagComponent,
     TerminalComponent,
     TranslatePipe,
+    XwaChartComponent,
   ],
   templateUrl: './audit.html',
   styleUrl: './audit.scss',
@@ -69,6 +75,52 @@ export class AuditComponent implements OnInit {
   readonly pdfBusy = signal(false);
 
   readonly summary = computed(() => severityCounts(this.findings()));
+
+  /**
+   * Category scores (0-100) for the four check categories, derived from
+   * finding severities with the same weighting used by the Lighthouse
+   * export. Colored by score: >=90 success, 60-89 warning, <60 accent.
+   */
+  readonly scoreChartData = computed<XwaChartDatum[]>(() => {
+    const categories: Array<[string, string]> = [
+      ['performance', this.translate.t('audit.performance')],
+      ['seo', this.translate.t('audit.seo')],
+      ['accessibility', this.translate.t('audit.accessibility')],
+      ['best_practices', this.translate.t('audit.best_practices')],
+    ];
+    return categories.map(([category, label]) => {
+      const items = this.findings().filter((finding) => finding.category === category);
+      const high = items.filter((f) => f.severity === 'high' || f.severity === 'critical').length;
+      const medium = items.filter((f) => f.severity === 'medium' || f.severity === 'low').length;
+      const score = Math.round(100 * Math.max(0, 1 - (high * 0.3 + medium * 0.1)));
+      const color: XwaChartColorKey = score >= 90 ? 'success' : score >= 60 ? 'warning' : 'critical';
+      return { label, value: score, color };
+    });
+  });
+
+  /** Issues by severity (XWA chart severity color mapping). */
+  readonly severityChartData = computed<XwaChartDatum[]>(() => {
+    const counts = this.summary();
+    const mapping: Array<[Severity, XwaChartColorKey, string]> = [
+      ['critical', 'critical', this.translate.t('audit.critical')],
+      ['high', 'warning', this.translate.t('audit.high')],
+      ['medium', 'neutral-strong', this.translate.t('audit.medium')],
+      ['low', 'success', this.translate.t('audit.low')],
+      ['info', 'interactive', this.translate.t('audit.info')],
+    ];
+    return mapping.map(([severity, color, label]) => ({
+      label,
+      value: counts[severity],
+      color,
+    }));
+  });
+
+  /** Issues by category (default categorical color sequence). */
+  readonly categoryChartData = computed<XwaChartDatum[]>(() =>
+    Object.entries(this.categoryCounts())
+      .sort((a, b) => b[1] - a[1])
+      .map(([category, value]) => ({ label: this.categoryLabel(category), value })),
+  );
 
   readonly categories = computed(() => [...new Set(this.findings().map((f) => f.category))]);
 
@@ -107,8 +159,34 @@ export class AuditComponent implements OnInit {
       const id = params['load'];
       if (typeof id === 'string' && id) {
         this.loadAudit(id);
+        return;
       }
+      this.loadLatestAudit();
     });
+  }
+
+  /**
+   * Dashboard mode: without a ?load= query parameter, show the most recent
+   * completed analysis so the category score, severity and category charts
+   * render with data on first paint.
+   */
+  private loadLatestAudit(): void {
+    this.api
+      .listAnalyses()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (records) => {
+          const latest = [...records]
+            .filter((record) => record.status === 'COMPLETED')
+            .sort((a, b) => b.created_at.localeCompare(a.created_at))[0];
+          if (latest) {
+            this.loadAudit(latest.id);
+          }
+        },
+        error: () => {
+          // No history yet: stay in form-only mode.
+        },
+      });
   }
 
   loadAudit(id: string): void {
