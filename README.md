@@ -232,3 +232,8 @@ tracing, dashmap, thiserror. See `docs/rust-libraries.md`.
 </a>
 
 </div>
+
+## License
+
+Proprietary — All rights reserved. See [LICENSE](LICENSE) for the full terms.
+For permission requests: x@xscriptor.com
