@@ -31,10 +31,9 @@ RUN adduser --disabled-password --gecos "" tengu
 
 WORKDIR /app
 
-COPY backend/pyproject.toml backend/uv.lock ./backend/
+COPY backend ./backend
 RUN cd backend && uv sync --frozen --no-dev
 
-COPY backend ./backend
 COPY --from=frontend-builder /out/static ./static
 
 RUN mkdir -p /data && chown -R tengu:tengu /data /app
