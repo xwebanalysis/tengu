@@ -22,19 +22,19 @@ warn() { echo -e "${YLW}[warn]${NC} $1"; }
 err()  { echo -e "${RED}[err]${NC} $1"; }
 
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
-RUST_PID=""
+SERVER_PID=""
+UV_BIN="${UV_BIN:-$(command -v uv 2>/dev/null || echo "$HOME/.local/bin/uv")}"
 
 # Defaults (XWA standard port for tengu)
 : "${PORT:=8070}"
 : "${TENGU_DB_PATH:=$PROJECT_ROOT/tengu.db}"
-: "${RUST_LOG:=tengu=info,tower_http=info}"
 
 cleanup() {
     echo ""
     warn "Shutting down..."
-    if [ -n "$RUST_PID" ]; then
-        kill "$RUST_PID" 2>/dev/null || true
-        wait "$RUST_PID" 2>/dev/null || true
+    if [ -n "$SERVER_PID" ]; then
+        kill "$SERVER_PID" 2>/dev/null || true
+        wait "$SERVER_PID" 2>/dev/null || true
     fi
     if command -v docker &>/dev/null; then
         local running
@@ -56,8 +56,14 @@ setup_node_path() {
 }
 
 check_deps() {
-    if ! command -v cargo &>/dev/null; then
-        err "Rust (cargo) not found. Install: https://rustup.rs"
+    if [ ! -x "$UV_BIN" ]; then
+        err "uv not found. Install it with:"
+        err "  curl -LsSf https://astral.sh/uv/install.sh | sh"
+        err "Or set UV_BIN=/path/to/uv"
+        exit 1
+    fi
+    if [ ! -f "$PROJECT_ROOT/backend/pyproject.toml" ]; then
+        err "Python backend not found at $PROJECT_ROOT/backend"
         exit 1
     fi
 }
@@ -139,19 +145,21 @@ start_server() {
         warn "No prebuilt frontend at $static_dir — serving API only (GET / returns JSON status)"
     fi
 
-    log "Starting Tengu on http://localhost:${PORT} (SQLite: ${TENGU_DB_PATH})"
-    PORT="$PORT" \
-    STATIC_DIR="$static_dir" \
-    TENGU_DB_PATH="$TENGU_DB_PATH" \
-    RUST_LOG="$RUST_LOG" \
-    cargo run --release &
-    RUST_PID=$!
+    log "Starting Tengu (Python) on http://localhost:${PORT} (SQLite: ${TENGU_DB_PATH})"
+    (
+        cd "$PROJECT_ROOT/backend"
+        PORT="$PORT" \
+        STATIC_DIR="$static_dir" \
+        TENGU_DB_PATH="$TENGU_DB_PATH" \
+        "$UV_BIN" run python -m tengu --host 0.0.0.0 --port "$PORT"
+    ) &
+    SERVER_PID=$!
 
     if wait_for_server; then
         log "Server ready"
     else
         err "Timed out waiting for server"
-        kill "$RUST_PID" 2>/dev/null || true
+        kill "$SERVER_PID" 2>/dev/null || true
         exit 1
     fi
 }
@@ -173,7 +181,7 @@ ${BLU}USAGE${NC}
   ./tengu.sh [command] [options]
 
 ${BLU}COMMANDS${NC}
-  local (default)   Start native server with SQLite on :8070 (prebuilt frontend if present)
+  local (default)   Start the Python server with SQLite on :8070
   docker            Start via docker-compose :8070 (persistent volume)
   build             Build frontend only, do not start server
   export [file]     Start server and export audits to ./exports/
@@ -189,7 +197,7 @@ ${BLU}ENVIRONMENT${NC}
   PORT                 HTTP port (default 8070)
   TENGU_DB_PATH        SQLite file (default <repo>/tengu.db)
   TENGU_MAX_HISTORY    Retention limit (default 100)
-  RUST_LOG             Log filter (default tengu=info,tower_http=info)
+  UV_BIN               Path to the uv binary (default: uv on PATH)
 
 ${BLU}EXAMPLES${NC}
   ./tengu.sh                        Start local (SQLite) at http://localhost:8070
@@ -264,7 +272,6 @@ case "$COMMAND" in
     build)
         cd "$PROJECT_ROOT"
         setup_node_path
-        check_deps
         build_frontend
         log "Build done"
         exit 0
@@ -298,7 +305,7 @@ case "$COMMAND" in
         fi
 
         print_urls
-        wait "$RUST_PID"
+        wait "$SERVER_PID"
         ;;
 
     import)
@@ -327,7 +334,7 @@ case "$COMMAND" in
         fi
 
         print_urls
-        wait "$RUST_PID"
+        wait "$SERVER_PID"
         ;;
 
     ""|local)
@@ -341,7 +348,7 @@ case "$COMMAND" in
         print_urls
         echo ""
 
-        wait "$RUST_PID"
+        wait "$SERVER_PID"
         ;;
 
     *)

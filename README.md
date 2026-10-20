@@ -23,7 +23,7 @@ Tengu is a web quality auditor that evaluates web applications across four dimen
 | **Accessibility** | Alt text, heading structure, ARIA attributes, landmarks, color contrast (WCAG AA/AAA), keyboard navigation, form labels, link text, tables, iframes, viewport configuration |
 | **Best Practices** | HTTPS enforcement, security headers (HSTS, CSP, XFO, etc.), cookie audit, GDPR banner detection, doctype validation, deprecated HTML, mixed content, SRI, console errors |
 
-**Local-first**: SQLite persistence by default, no external services required. PostgreSQL is available behind an optional Cargo feature.
+**Local-first**: SQLite persistence by default, no external services required. The backend is Python 3.12+ (FastAPI + httpx + BeautifulSoup/lxml).
 
 ## Quick Start
 
@@ -33,14 +33,21 @@ Tengu is a web quality auditor that evaluates web applications across four dimen
 ./tengu.sh            # same as: ./tengu.sh local
 ```
 
-Starts the Axum backend on `http://localhost:8070` with a SQLite database at
+Starts the Python backend on `http://localhost:8070` with a SQLite database at
 `<repo>/tengu.db` and serves the prebuilt Angular frontend when present
-(`static/browser/` or `frontend/dist/`).
-
-### Cargo directly
+(`static/browser/` or `frontend/dist/`). The script uses `uv` to create the
+backend environment on first run; install it with:
 
 ```bash
-TENGU_DB_PATH=/tmp/tengu.db PORT=8070 cargo run --release
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### Python directly
+
+```bash
+cd backend
+uv sync
+TENGU_DB_PATH=/tmp/tengu.db uv run python -m tengu --port 8070
 ```
 
 ### Frontend (development)
@@ -58,9 +65,10 @@ npm start                     # dev server on :4270, talks to :8070
 ```
 
 The production build is written to `<repo>/static/browser` and served by the
-Axum fallback (`STATIC_DIR`). `outputHashing: none` keeps `main.js`/`styles.css`
-stable so Rust can serve them without a manifest. The backend `build.rs` never
-compiles the frontend; use `./tengu.sh build` or the npm commands above.
+FastAPI SPA fallback (`STATIC_DIR`). `outputHashing: none` keeps
+`main.js`/`styles.css` stable so the backend can serve them without a manifest.
+The backend never compiles the frontend; use `./tengu.sh build` or the npm
+commands above.
 
 ### Docker Compose
 
@@ -96,7 +104,6 @@ if the lockfile is missing) when `frontend/node_modules` is absent.
 | `PORT` | `8070` | HTTP listen port (XWA standard) |
 | `STATIC_DIR` | `static/browser` | Directory served by the SPA fallback |
 | `TENGU_DB_PATH` | `tengu.db` (`/data/tengu.db` in Docker) | SQLite database file |
-| `DATABASE_URL` | — | PostgreSQL DSN (requires `--features pg`) |
 | `TENGU_MAX_HISTORY` | `100` | Maximum persisted audits (retention) |
 | `TENGU_API_KEY` | — | Optional API key (`X-API-Key` or `Authorization: Bearer`) |
 | `TENGU_HTTP_TIMEOUT` | `30` | HTTP client timeout (seconds) |
@@ -111,7 +118,6 @@ if the lockfile is missing) when `frontend/node_modules` is absent.
 | `TENGU_CRAWL_DELAY_MIN_MS` / `_MAX_MS` | `200` / `800` | Delay with jitter between crawl requests |
 | `TENGU_ROBOTS_TXT` | `1` | Respect `robots.txt` during crawls (`0` disables) |
 | `XWA_CORS_ORIGINS` | localhost/LAN | Comma-separated allowed origins (credentials always disabled) |
-| `RUST_LOG` | `tengu=info,tower_http=info` | Logging verbosity |
 
 ## API Endpoints
 
@@ -179,29 +185,36 @@ and retries transient failures with exponential backoff + jitter.
 
 ```
 tengu/
-├── src/
-│   ├── main.rs              # Axum server, middleware, CORS, rate limit
-│   ├── contracts.rs         # xwa-sdk 0.2.0 contract models
-│   ├── config.rs            # Environment configuration
-│   ├── api/routes.rs        # REST API + WebSocket event streaming
-│   ├── auditor/             # Performance, SEO, a11y, best-practices engines
-│   └── storage/mod.rs       # Memory / SQLite / PostgreSQL stores
+├── backend/
+│   ├── pyproject.toml       # Python 3.12+ dependencies (uv)
+│   ├── uv.lock              # Reproducible backend environment
+│   ├── tengu/
+│   │   ├── main.py          # CLI entry point
+│   │   ├── api.py           # FastAPI REST + WebSocket + SPA fallback
+│   │   ├── config.py        # Environment configuration
+│   │   ├── models.py        # xwa-sdk 0.2.0 contracts
+│   │   ├── storage.py       # SQLite persistence (legacy schema compatible)
+│   │   ├── events.py        # xwa-sdk Event emitter
+│   │   ├── http.py          # httpx client, retries, robots/crawl/batch
+│   │   └── audit/           # Performance, SEO, a11y, best-practices engines
+│   └── tests/               # pytest suite (API, WS, storage, auditors)
 ├── frontend/                # Angular 22 SPA (zoneless, Nothing Design, Vitest)
 │   ├── src/app/core/        # api, ws/event parsing, theme, i18n, exports
 │   ├── src/app/shared/      # terminal, html-viewer, metric-card, tags, exports
 │   └── src/app/features/    # audit, history
 ├── docs/                    # Technical documentation
-├── Dockerfile               # Multi-stage Rust + Angular build
+├── Dockerfile               # Multi-stage Python + Angular build
 ├── docker-compose.yml       # Single service with persistent SQLite volume
-├── tengu.sh                 # Local-first launch script
+├── tengu.sh                 # Local-first launch script (uv + Python)
 └── clean.sh                 # Local + Docker cleanup (removes tengu.db*)
 ```
 
 ## Backend Dependencies
 
-Axum 0.8, Tokio 1.53, tower-http 0.7, reqwest 0.13 (rustls), scraper 0.27,
-sqlx 0.9 (SQLite by default; PostgreSQL behind `--features pg`), serde,
-tracing, dashmap, thiserror. See `docs/rust-libraries.md`.
+FastAPI, Uvicorn, httpx, BeautifulSoup 4, lxml, and the Python standard
+library `sqlite3`. The backend is managed by `uv`; see
+[`backend/pyproject.toml`](backend/pyproject.toml) and
+[docs/python-libraries.md](docs/python-libraries.md).
 
 ## Related Documents
 
@@ -209,7 +222,7 @@ tracing, dashmap, thiserror. See `docs/rust-libraries.md`.
 |---|---|
 | [docs/manual.md](docs/manual.md) | Deployment and usage manual |
 | [docs/ui-architecture.md](docs/ui-architecture.md) | Frontend architecture overview |
-| [docs/rust-libraries.md](docs/rust-libraries.md) | Rust backend dependency inventory |
+| [docs/python-libraries.md](docs/python-libraries.md) | Python backend dependency inventory |
 | [ROADMAP.md](ROADMAP.md) | Development phases and milestones |
 | [CHANGELOG.md](CHANGELOG.md) | Release history and version log |
 | [SECURITY.md](SECURITY.md) | Security policy and reporting |

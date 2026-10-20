@@ -8,7 +8,7 @@
 ./tengu.sh            # ./tengu.sh local
 ```
 
-Servidor Axum nativo en `http://localhost:8070` con SQLite en
+Servidor Python (FastAPI) en `http://localhost:8070` con SQLite en
 `<repo>/tengu.db` (configurable con `TENGU_DB_PATH`).
 
 ### Docker (volumen SQLite persistente)
@@ -22,13 +22,16 @@ Interfaz web en `http://localhost:8070`; base de datos en `/data/tengu.db`.
 ### Standalone
 
 ```bash
-TENGU_DB_PATH=/tmp/tengu.db PORT=8070 cargo run --release
+cd backend
+uv sync
+TENGU_DB_PATH=/tmp/tengu.db uv run python -m tengu --port 8070
 ```
 
-Requiere Rust 1.86+. `build.rs` **no** compila el frontend: solo declara rutas
-`rerun-if-changed`. Para construir la UI usa `./tengu.sh build` o, dentro de
-`frontend/`, `npm ci && npm run build` con Node 24 (Angular 22 + Nothing
-Design; la salida va a `../static`). `npm test` ejecuta la suite Vitest.
+Requiere [`uv`](https://astral.sh/uv) y Python 3.12+. `uv` descarga el
+intérprete la primera vez. El backend **no** compila el frontend: para construir
+la UI usa `./tengu.sh build` o, dentro de `frontend/`, `npm ci && npm run build`
+con Node 24 (Angular 22 + Nothing Design; la salida va a `../static`).
+`npm test` ejecuta la suite Vitest.
 Interfaz web en `http://localhost:8070`.
 
 ### Script de Inicio
@@ -50,13 +53,12 @@ Interfaz web en `http://localhost:8070`.
 |---|---|---|
 | `PORT` | `8070` | Puerto de escucha HTTP |
 | `TENGU_DB_PATH` | `tengu.db` (`/data/tengu.db` en Docker) | Fichero SQLite |
-| `DATABASE_URL` | — | DSN PostgreSQL (requiere `--features pg`) |
 | `TENGU_MAX_HISTORY` | `100` | Auditorias persistidas maximas |
 | `TENGU_MAX_PAGES` / `TENGU_CRAWL_DEPTH` | `50` / `2` | Limites de crawl |
 | `TENGU_ROBOTS_TXT` | `1` | Respetar robots.txt (`0` lo desactiva) |
 | `TENGU_RATE_LIMIT_PER_MINUTE` | `120` | Token bucket REST/WS |
 | `XWA_CORS_ORIGINS` | localhost/LAN | Origenes CORS permitidos |
-| `RUST_LOG` | `tengu=info,tower_http=info` | Verbosidad de logging (env-filter) |
+
 
 ## Uso
 
@@ -84,11 +86,11 @@ Cada hallazgo muestra:
 - **Titulo**: Resumen del problema
 - **Descripcion**: Explicacion detallada con recomendaciones
 - **Fragmento**: El elemento HTML relevante (si aplica)
-- **Linea**: Numero de linea en el codigo HTML formateado
+- **Linea**: Numero de linea en el codigo HTML recibido
 
 ### Visor de Codigo Fuente
 
-Despues de una auditoria, haz clic en VIEW HTML para ver el codigo fuente formateado. Las lineas con hallazgos se resaltan con un borde rojo a la izquierda.
+Despues de una auditoria, haz clic en VIEW HTML para ver el codigo fuente recibido. Las lineas con hallazgos se resaltan con un borde rojo a la izquierda.
 
 ### Exportacion
 
@@ -122,12 +124,12 @@ Los resultados se pueden exportar en seis formatos:
 ## Solucion de Problemas
 
 ### La conexion WebSocket falla
-Asegurate de que el puerto sea accesible y que ningun firewall bloquee las actualizaciones WebSocket. Usa `RUST_LOG=debug` para ver los detalles de las peticiones.
+Asegurate de que el puerto sea accesible y que ningun firewall bloquee las actualizaciones WebSocket. Ejecuta el backend con logging debug de `uvicorn` para ver los detalles de las peticiones.
 
 ### La auditoria no devuelve hallazgos
-La auditoria analiza el HTML despues de formatearlo. Si la pagina esta vacia, detras de un login o bloquea bots, los resultados pueden estar vacios. Prueba con una pagina accesible publicamente.
+La auditoria analiza el HTML recibido. Si la pagina esta vacia, detras de un login o bloquea bots, los resultados pueden estar vacios. Prueba con una pagina accesible publicamente.
 
-### Error de compilacion
-- Rust: asegura tener 1.81+ con `rustup update`
+### Error de arranque
+- Backend: verifica que `uv` este instalado y ejecuta `cd backend && uv sync`
 - Frontend: `cd frontend && npm ci` para instalar dependencias
 - Compilacion limpia: `./clean.sh` y reintenta

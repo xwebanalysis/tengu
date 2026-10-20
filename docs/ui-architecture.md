@@ -6,8 +6,8 @@ Angular 22 standalone (no NgModules), zoneless change detection
 (`provideZonelessChangeDetection`), TypeScript 6, `@angular/build:application`,
 Vitest 4 + jsdom through `@angular/build:unit-test`. Node 24 is required
 (`mise`). The production build is emitted to `../static` with
-`outputHashing: "none"` so the Axum backend can serve `static/browser/main.js`
-and `static/browser/styles.css` without a manifest.
+`outputHashing: "none"` so the FastAPI backend can serve
+`static/browser/main.js` and `static/browser/styles.css` without a manifest.
 
 All UI state is signal-based: WebSocket callbacks mutate signals and zoneless
 change detection schedules the view update automatically.

@@ -21,7 +21,7 @@ Tengu es un auditor de calidad web que evalua aplicaciones en cuatro dimensiones
 
 | Interfaz | Directorio | Lenguaje | Tipo |
 |---|---|---|---|
-| **Tengu Web** | `/` (raiz del monorepo) | Rust (Axum) + Angular 22 | Aplicacion web (standalone o Docker) |
+| **Tengu Web** | `/` (raiz del monorepo) | Python (FastAPI) + Angular 22 | Aplicacion web (standalone o Docker) |
 
 ## Inicio Rapido
 
@@ -31,13 +31,16 @@ Tengu es un auditor de calidad web que evalua aplicaciones en cuatro dimensiones
 ./tengu.sh            # ./tengu.sh local
 ```
 
-Backend nativo en `http://localhost:8070` con SQLite en `<repo>/tengu.db`
+Backend Python en `http://localhost:8070` con SQLite en `<repo>/tengu.db`
 (configurable con `TENGU_DB_PATH`). Sirve el frontend preconstruido si existe.
+Requiere [`uv`](https://astral.sh/uv) y Python 3.12+.
 
-### Directo con Cargo
+### Directo con Python
 
 ```
-TENGU_DB_PATH=/tmp/tengu.db PORT=8070 cargo run --release
+cd backend
+uv sync
+TENGU_DB_PATH=/tmp/tengu.db uv run python -m tengu --port 8070
 ```
 
 Web UI en `http://localhost:8070`.
@@ -61,7 +64,6 @@ Web UI en `http://localhost:8070`; la base SQLite persiste en el volumen
 | `TENGU_RATE_LIMIT_PER_MINUTE` | `120` | Rate limit REST/WS |
 | `TENGU_MAX_PAGES` / `TENGU_CRAWL_DEPTH` | `50` / `2` | Limites del crawl |
 | `XWA_CORS_ORIGINS` | localhost/LAN | Origenes CORS permitidos |
-| `RUST_LOG` | `tengu=info,tower_http=info` | Verbosidad de logging |
 
 ## Documentos Relacionados
 
@@ -71,28 +73,26 @@ Web UI en `http://localhost:8070`; la base SQLite persiste en el volumen
 | [CHANGELOG.md](../../CHANGELOG.md) | Historial de versiones |
 | [manual.md](manual.md) | Guia de despliegue y uso |
 | [ui-architecture.md](ui-architecture.md) | Arquitectura del frontend |
-| [rust-libraries.md](rust-libraries.md) | Dependencias Rust del backend |
+| [python-libraries.md](python-libraries.md) | Dependencias Python del backend |
 | [uses/audit.md](uses/audit.md) | Guia de uso del auditor |
 
 ## Estructura del Proyecto
 
 ```
 tengu/
-├── src/
-│   ├── main.rs              # Punto de entrada del servidor Axum
-│   ├── config.rs            # Configuracion de auditoria
-│   ├── api/
-│   │   └── routes.rs        # API REST + WebSocket
-│   ├── auditor/
-│   │   ├── mod.rs           # Orquestador + modelo Finding
-│   │   ├── performance.rs   # Peso, recursos, imagenes, fuentes
-│   │   ├── seo.rs           # Meta tags, datos estructurados
-│   │   ├── a11y.rs          # Cumplimiento WCAG, ARIA
-│   │   ├── best_practices.rs# Headers de seguridad, cookies
-│   │   └── html_pretty.rs   # Pretty-printing de HTML
-│   └── storage/
-│       └── mod.rs           # Almacenamiento en memoria / SQLite / PostgreSQL
-├── contracts.rs             # Contratos xwa-sdk 0.2.0 (Analysis, Finding, Event)
+├── backend/
+│   ├── pyproject.toml       # Dependencias Python 3.12+ (uv)
+│   ├── uv.lock              # Entorno reproducible
+│   ├── tengu/
+│   │   ├── main.py          # Punto de entrada CLI
+│   │   ├── api.py           # FastAPI REST + WebSocket + fallback SPA
+│   │   ├── config.py        # Configuracion de auditoria
+│   │   ├── models.py        # Contratos xwa-sdk 0.2.0
+│   │   ├── storage.py       # Persistencia SQLite (esquema compatible)
+│   │   ├── events.py        # Emisor de eventos xwa-sdk
+│   │   ├── http.py          # httpx, reintentos, robots/crawl/batch
+│   │   └── audit/           # Motores de rendimiento, SEO, a11y y buenas practicas
+│   └── tests/               # Suite pytest (API, WS, storage, auditores)
 ├── frontend/                # Angular 22 (zoneless, Vitest, Nothing Design)
 │   ├── package.json
 │   ├── angular.json
@@ -102,12 +102,11 @@ tengu/
 ├── docs/                    # Documentacion tecnica
 │   ├── manual.md
 │   ├── ui-architecture.md
-│   ├── rust-libraries.md
+│   ├── python-libraries.md
 │   ├── uses/audit.md
 │   └── esp/                 # Documentacion en espanol
 ├── Dockerfile
 ├── docker-compose.yml
-├── Cargo.toml
 ├── ROADMAP.md
 └── CHANGELOG.md
 ```
