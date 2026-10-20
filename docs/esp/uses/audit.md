@@ -91,7 +91,7 @@ Cada hallazgo tiene:
 - **Titulo**: Resumen de una linea
 - **Descripcion**: Explicacion detallada, impacto y recomendacion actionable
 - **Fragmento**: El elemento HTML relevante (si aplica)
-- **Linea**: Numero de linea en el codigo HTML formateado
+- **Linea**: Numero de linea en el codigo HTML recibido
 
 ## Exportacion de Resultados
 

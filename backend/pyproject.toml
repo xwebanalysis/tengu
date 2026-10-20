@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tengu-backend"
+version = "0.2.0"
+description = "Tengu web quality auditor — Python backend"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.34",
+  "httpx>=0.28",
+  "beautifulsoup4>=4.12",
+  "lxml>=5.3",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8",
+  "pytest-asyncio>=0.25",
+]
+
+[tool.setuptools]
+packages = ["tengu", "tengu.audit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+pythonpath = ["."]
+
+[tool.uv]
+package = true

@@ -91,7 +91,7 @@ Each finding has:
 - **Title**: One-line summary
 - **Description**: Detailed explanation, impact, and actionable recommendation
 - **Snippet**: The relevant HTML element (if applicable)
-- **Line**: Line number in the pretty-printed HTML source
+- **Line**: Line number in the fetched HTML source
 
 ## Exporting Results
 

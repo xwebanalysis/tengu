@@ -4,6 +4,14 @@ All notable changes to the Tengu project will be documented in this file.
 
 ## Unreleased
 
+### Backend
+
+- **Migrated the backend from Rust/Axum to Python 3.12 + FastAPI**, preserving
+  the REST routes, WebSocket `Event` protocol, xwa-sdk contracts and the
+  existing SQLite schema. Added `httpx` retries, BeautifulSoup/lxml analyzers,
+  batch/full-site crawling, auth, rate limiting, Prometheus metrics and a
+  pytest suite. `tengu.sh` now bootstraps the environment with `uv`.
+
 ### Frontend
 
 - **Angular 19 → 22** (`@angular/build:application`, TypeScript 6, zoneless

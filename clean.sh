@@ -16,7 +16,9 @@ PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 clean_local_build() {
     info "Cleaning local build artifacts..."
-    rm -rf "$PROJECT_ROOT/target" 2>/dev/null && info "  Removed target/"
+    rm -rf "$PROJECT_ROOT/backend/.venv" 2>/dev/null && info "  Removed backend/.venv/"
+    rm -rf "$PROJECT_ROOT/backend/.pytest_cache" 2>/dev/null && info "  Removed backend/.pytest_cache/"
+    find "$PROJECT_ROOT/backend" -type d -name __pycache__ -prune -exec rm -rf {} + 2>/dev/null && info "  Removed Python caches"
     rm -rf "$PROJECT_ROOT/frontend/node_modules" 2>/dev/null && info "  Removed frontend/node_modules/"
     rm -rf "$PROJECT_ROOT/frontend/.angular" 2>/dev/null && info "  Removed frontend/.angular/"
     if ls "$PROJECT_ROOT"/tengu.db* >/dev/null 2>&1; then
@@ -88,7 +90,8 @@ Options:
   -v, --volumes  Remove Docker volumes only (retain images)
   -h, --help     Show this help
 
-Without options, removes containers, target/, node_modules/, .angular/ cache and tengu.db*.
+Without options, removes containers, backend/.venv, Python caches, node_modules/,
+.angular/ cache and tengu.db*.
 EOF
     exit 0
 }

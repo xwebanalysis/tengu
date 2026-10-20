@@ -1,6 +1,6 @@
 # Tengu — E2E browser smoke test
 
-`browser_smoke.py` drives the Angular UI served by the Rust backend with
+`browser_smoke.py` drives the Angular UI served by the Python backend with
 Playwright (headless Chromium). It verifies that WebSocket streamed data renders
 **without user interaction** in the zoneless app.
 
@@ -13,8 +13,8 @@ Playwright (headless Chromium). It verifies that WebSocket streamed data renders
 2. **No spurious WebSocket error** — the backend drops the socket after a
    terminal event (browser sees 1006); the UI must complete cleanly without
    `[!] WebSocket connection error`.
-3. **Pretty HTML** — the source panel is available when the stream ends and the
-   viewer renders the pretty-printed HTML.
+3. **HTML source** — the source panel is available when the stream ends and the
+   viewer renders the fetched HTML.
 4. **Exports** — CSV, JSON, Lighthouse JSON, HTML, Markdown and PDF all download
    from the UI; the PDF button resets after the async export.
 5. **History** — lists the audits, renders the trend chart (≥ 2 audits), loads a
@@ -36,7 +36,7 @@ The fixture lives in `e2e/fixture/` (missing metas/headings, images without
 ## Run
 
 ```bash
-# 1. Build the UI that the Rust server serves (static/browser)
+# 1. Build the UI that the Python server serves (static/browser)
 export PATH="$HOME/.local/share/mise/installs/node/24/bin:$PATH"
 cd frontend && npm ci && npm run build
 

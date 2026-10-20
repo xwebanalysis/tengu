@@ -9,7 +9,7 @@ services:
       - PORT=8070
       - STATIC_DIR=/app/static/browser
       - TENGU_DB_PATH=/data/tengu.db
-      - RUST_LOG=tengu=info,tower_http=info
+      - TENGU_LOG_LEVEL=info
       - TENGU_MAX_HISTORY=100
       - TENGU_RATE_LIMIT_PER_MINUTE=120
       - TENGU_RATE_LIMIT_BURST=30
@@ -18,7 +18,7 @@ services:
     volumes:
       - tengu_data:/data
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8070' || exit 1"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8070/api/health', timeout=3)"]
       interval: 30s
       timeout: 5s
       retries: 3

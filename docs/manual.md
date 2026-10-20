@@ -8,21 +8,25 @@
 ./tengu.sh            # ./tengu.sh local
 ```
 
-Starts the native Axum server on `http://localhost:8070` using SQLite at
+Starts the Python backend on `http://localhost:8070` using SQLite at
 `<repo>/tengu.db` (override with `TENGU_DB_PATH`). If a prebuilt frontend exists
 (`static/browser/` or `frontend/dist/tengu/browser/`), it is served at `/`.
 
-### Cargo directly
+Requires [`uv`](https://astral.sh/uv) and Python 3.12+. `uv` downloads the
+interpreter on first use; no system Python packages are required.
+
+### Python directly
 
 ```bash
-TENGU_DB_PATH=/tmp/tengu.db PORT=8070 cargo run --release
+cd backend
+uv sync
+TENGU_DB_PATH=/tmp/tengu.db uv run python -m tengu --port 8070
 ```
 
-Requires Rust 1.86+ (edition 2021). `build.rs` does **not** compile the
-frontend: it only declares `rerun-if-changed` paths so Cargo rebuilds when
-frontend metadata changes. To build the UI use `./tengu.sh build` or, inside
-`frontend/`, `npm ci && npm run build` with Node 24 (Angular 22 + Nothing
-Design; output goes to `../static`). `npm test` runs the Vitest suite.
+The backend does **not** compile the frontend. To build the UI use
+`./tengu.sh build` or, inside `frontend/`, `npm ci && npm run build` with Node
+24 (Angular 22 + Nothing Design; output goes to `../static`). `npm test` runs
+the Vitest suite.
 
 ### Docker (persistent SQLite volume)
 
@@ -54,7 +58,6 @@ Web UI and API at `http://localhost:8070`. The database is persisted in the
 | `PORT` | `8070` | HTTP listen port |
 | `STATIC_DIR` | `static/browser` | SPA assets directory |
 | `TENGU_DB_PATH` | `tengu.db` (`/data/tengu.db` in Docker) | SQLite database file |
-| `DATABASE_URL` | — | PostgreSQL DSN (requires `--features pg`) |
 | `TENGU_MAX_HISTORY` | `100` | Maximum persisted audits |
 | `TENGU_API_KEY` | — | Optional API key (`X-API-Key` header) |
 | `TENGU_HTTP_TIMEOUT` | `30` | HTTP client timeout (s) |
@@ -69,7 +72,7 @@ Web UI and API at `http://localhost:8070`. The database is persisted in the
 | `TENGU_CRAWL_DELAY_MIN_MS` / `_MAX_MS` | `200` / `800` | Jittered delay |
 | `TENGU_ROBOTS_TXT` | `1` | Respect robots.txt (`0` disables) |
 | `XWA_CORS_ORIGINS` | localhost/LAN | Allowed CORS origins |
-| `RUST_LOG` | `tengu=info,tower_http=info` | Logging verbosity |
+
 
 ## Usage
 
@@ -100,7 +103,7 @@ snippet and source line. The backend maps the internal Tengu severities:
 
 ### HTML Source Viewer
 
-After an audit completes, click VIEW HTML to see the pretty-printed source.
+After an audit completes, click VIEW HTML to see the fetched source.
 The source also travels as the payload of a `log` event.
 
 ### Export
@@ -137,8 +140,8 @@ SQLite is the default store:
 - Writes are write-through on every insert/delete/clear; records are loaded on startup.
 - `TENGU_MAX_HISTORY` prunes the oldest rows beyond the retention limit.
 
-PostgreSQL remains optional (`cargo build --release --features pg` +
-`DATABASE_URL`); it now uses the same write-through interface (no 5 s sync loop).
+PostgreSQL is not wired into the Python backend yet; SQLite is the supported
+store and uses the same schema as the previous backend.
 
 ## Security
 
@@ -154,14 +157,14 @@ PostgreSQL remains optional (`cargo build --release --features pg` +
 ## Troubleshooting
 
 ### WebSocket connection fails
-Ensure the port is reachable and no firewall blocks WebSocket upgrades. Check
-`RUST_LOG=debug` for request details.
+Ensure the port is reachable and no firewall blocks WebSocket upgrades. Run
+the backend with `uvicorn` debug logging for request details.
 
 ### Audit returns no findings
-The audit parses the HTML after pretty-printing. If the page is empty, behind a
-login wall, or blocks bots, results may be empty. Try a publicly accessible page.
+The audit parses the fetched HTML. If the page is empty, behind a login wall,
+or blocks bots, results may be empty. Try a publicly accessible page.
 
 ### Build fails
-- Rust: ensure 1.86+ with `rustup update`.
-- Frontend: `./tengu.sh build` (uses Node 24 from mise when available).
+- Backend: ensure `uv` is installed and run `cd backend && uv sync`.
+- Frontend: `./tengu.sh build` (Node 24+; Angular 22).
 - Clean build: `./clean.sh` then retry (it also removes `tengu.db*`).

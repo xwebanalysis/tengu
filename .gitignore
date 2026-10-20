@@ -17,6 +17,13 @@ tengu.db
 tengu.db-wal
 tengu.db-shm
 
+# Python backend
+backend/.venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/*.egg-info/
+
 # Environment / secrets
 .env
 .env.local

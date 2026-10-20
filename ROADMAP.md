@@ -3,7 +3,8 @@
 This document tracks the strategic steps required to evolve Tengu into a full-scale web quality auditing platform.
 This file is formatted to be synced automatically with GitHub Issues using the `xgh` roadmap standard.
 
-> Status: 2026-09-12 — backend `0.2.0` (Axum 0.8, SQLite-first, xwa-sdk contracts).
+> Status: 2026-10-20 — backend `0.2.0` migrated to Python 3.12
+> (FastAPI + httpx + BeautifulSoup/lxml, SQLite-first, xwa-sdk contracts).
 > Frontend on Angular 22 (zoneless, Vitest, Nothing Design) consuming the xwa-sdk `Event` protocol.
 
 ## Core Engine <!-- phase:core -->
@@ -15,7 +16,8 @@ This file is formatted to be synced automatically with GitHub Issues using the `
 - [x] Crawl mode for full-site auditing with depth/pages configuration (`TENGU_CRAWL_DEPTH`, `TENGU_MAX_PAGES`)
 - [x] Request watermarking (request ID, timestamp per analysis)
 - [x] `robots.txt` respected by default with jittered 200–800 ms crawl delay
-- [x] Bounded concurrency (`TENGU_MAX_CONCURRENT`) and cancel-on-disconnect
+- [x] Bounded concurrency (`TENGU_MAX_CONCURRENT`)
+- [ ] Cancel-on-disconnect for running audits
 
 ## Performance Analysis <!-- phase:performance -->
 
@@ -80,11 +82,11 @@ This file is formatted to be synced automatically with GitHub Issues using the `
 
 ## Backend API <!-- phase:backend -->
 
-- [x] Axum project scaffold with JSON `/api/health` (`status`, `service`, `version`, `database`)
+- [x] FastAPI project scaffold with JSON `/api/health` (`status`, `service`, `version`, `database`)
 - [x] REST endpoints for audit CRUD (list/get/delete/clear/import/export)
 - [x] WebSocket endpoint for real-time audit streaming (`/api/audit/live`)
 - [x] SQLite persistence by default (WAL, `busy_timeout`, write-through, `schema_meta`)
-- [x] Optional PostgreSQL backend behind `--features pg` (write-through)
+- [ ] Optional PostgreSQL backend (planned; SQLite is the supported store)
 - [x] Database export/import following the XWA pattern
 - [x] xwa-sdk `Event`/`Analysis`/`Finding` contracts over REST and WS
 - [x] Server-side export `format=json|csv` with `Content-Disposition`
